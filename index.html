@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Salud Marrana 🐷</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>🐷 Salud Marrana</h1>
+            <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+        </header>
+
+        <main class="app-content">
+            <div class="card-bienvenida">
+                <h2>¡Conectado! 🎉</h2>
+                <p>Si ves este mensaje, la autenticación con Supabase funciona perfecto.</p>
+            </div>
+
+            <div id="info-conexion" style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--sombra-sm);">
+                <p style="font-size: 13px; color: var(--texto-secundario); margin-bottom: 10px;">
+                    <strong>Estado de conexión:</strong>
+                </p>
+                <div id="estado-supabase">Verificando...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+
+    <script>
+        (async () => {
+            // Proteger página: si no hay sesión, manda al login
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            // Probar conexión a Supabase consultando los miembros
+            const estadoEl = document.getElementById('estado-supabase');
+            try {
+                const { data, error } = await sb
+                    .from('miembros')
+                    .select('nombre, apodo, color_hex, emoji')
+                    .order('fecha_nacimiento', { ascending: true });
+
+                if (error) throw error;
+
+                let html = '<p style="color: var(--color-exito); font-weight: 600; margin-bottom: 12px;">✅ Conectado a Supabase</p>';
+                html += '<p style="font-size: 13px; color: var(--texto-secundario); margin-bottom: 10px;"><strong>Familia Marrana detectada:</strong></p>';
+                html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                data.forEach(m => {
+                    html += `
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: ${m.color_hex}15;">
+                            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${m.color_hex}; display: flex; align-items: center; justify-content: center; font-size: 18px;">${m.emoji}</div>
+                            <strong>${m.apodo}</strong>
+                            <span style="margin-left: auto; font-size: 12px; color: var(--texto-secundario);">${m.nombre}</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                estadoEl.innerHTML = html;
+            } catch (err) {
+                estadoEl.innerHTML = `
+                    <p style="color: var(--color-error); font-weight: 600;">❌ Error de conexión</p>
+                    <p style="font-size: 12px; color: var(--texto-secundario); margin-top: 8px;">${err.message}</p>
+                `;
+                console.error(err);
+            }
+        })();
+    </script>
+</body>
+</html>
