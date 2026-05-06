@@ -25,9 +25,38 @@
             <div id="evento-contenido" style="display: none;">
                 <div id="evento-hero" class="info-card"></div>
                 <div id="evento-detalles" class="info-card"></div>
+
+                <!-- Sección de documentos -->
+                <div class="info-card">
+                    <h4>📎 Documentos</h4>
+                    <div id="docs-evento-lista" style="margin-bottom: 16px;"></div>
+
+                    <details class="acordeon" style="margin-top: 12px;">
+                        <summary class="acordeon-trigger" style="list-style: none; cursor: pointer;">
+                            <span>➕ Agregar documento</span>
+                        </summary>
+                        <div style="padding-top: 12px;">
+                            <div class="docs-botones">
+                                <label class="btn-doc-upload">
+                                    📷 Sacar foto
+                                    <input type="file" accept="image/*" capture="environment" onchange="manejarUploadDirecto(this)" multiple>
+                                </label>
+                                <label class="btn-doc-upload">
+                                    🖼️ De galería
+                                    <input type="file" accept="image/*" onchange="manejarUploadDirecto(this)" multiple>
+                                </label>
+                                <label class="btn-doc-upload">
+                                    📄 PDF
+                                    <input type="file" accept="application/pdf" onchange="manejarUploadDirecto(this)" multiple>
+                                </label>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
                 <div id="evento-acciones" style="display: flex; gap: 10px; margin-top: 20px;">
                     <button class="btn-secundario" onclick="eliminarEventoHandler()" style="flex: 1;">
-                        🗑️ Eliminar
+                        🗑️ Eliminar evento
                     </button>
                 </div>
             </div>
@@ -39,6 +68,7 @@
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/utils.js"></script>
+    <script src="js/documentos.js"></script>
     <script src="js/eventos.js"></script>
 
     <script>
@@ -177,6 +207,35 @@
             }
         };
 
+        // Subir docs directamente al evento ya creado
+        window.manejarUploadDirecto = async function(input) {
+            const archivos = Array.from(input.files);
+            if (archivos.length === 0) return;
+
+            const eventoId = datosEvento.evento.id;
+            const miembroId = datosEvento.evento.miembro_id;
+
+            mostrarToast(`Subiendo ${archivos.length} archivo${archivos.length > 1 ? 's' : ''}...`, 'info');
+
+            for (const file of archivos) {
+                const doc = await agregarDocPendiente(file);
+                if (doc) {
+                    try {
+                        await subirDocumento(doc, miembroId, eventoId);
+                    } catch (err) {
+                        console.error('Error subiendo:', err);
+                        mostrarToast('Error subiendo ' + file.name, 'error');
+                    }
+                }
+            }
+
+            // Limpiar pendientes y refrescar lista
+            docsPendientes.length = 0;
+            input.value = '';
+            await renderizarDocsGuardados('docs-evento-lista', eventoId);
+            mostrarToast('Documentos agregados ✅', 'exito');
+        };
+
         (async () => {
             const ok = await protegerPagina();
             if (!ok) return;
@@ -192,6 +251,8 @@
             try {
                 datosEvento = await cargarEvento(id);
                 renderizar(datosEvento);
+                // Cargar documentos del evento
+                await renderizarDocsGuardados('docs-evento-lista', id);
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al cargar el evento', 'error');
