@@ -27,6 +27,22 @@ const ESPECIALIDADES = [
     'Otra'
 ];
 
+// Centros médicos frecuentes
+const CENTROS_MEDICOS = [
+    'CLC Chicureo',
+    'CLC Estoril',
+    'Clínica Las Condes (otra sede)',
+    'Clínica Santa María Providencia',
+    'Clínica Santa María La Dehesa',
+    'Integramédica',
+    'RedSalud',
+    'Indisa',
+    'Vidaintegra',
+    'Hospital público',
+    'Consulta particular',
+    'Otro'
+];
+
 // Definición de campos según tipo de evento
 const CAMPOS_POR_TIPO = {
     sintoma: {
@@ -137,7 +153,65 @@ function renderizarSelectorTipos() {
         `;
     }
     cont.innerHTML = html;
+
+    // Si el tipo es medicamento, inicializar campos dinámicos
+    if (tipo === 'medicamento') {
+        actualizarCamposMedicamento();
+    }
 }
+
+// Renderiza los campos de fechas según el tipo de uso del medicamento
+window.actualizarCamposMedicamento = function() {
+    const container = document.getElementById('med-fechas-container');
+    const ayudaEl = document.getElementById('med-tipo-ayuda');
+    if (!container) return;
+
+    const hoy = new Date().toISOString().split('T')[0];
+    const tipoEl = document.querySelector('input[name="med-tipo"]:checked');
+    const tipo = tipoEl ? tipoEl.value : 'puntual';
+
+    let html = '';
+    let ayuda = '';
+
+    if (tipo === 'puntual') {
+        // Solo fecha de la toma
+        html = `
+            <div class="form-group">
+                <label for="med-fecha-inicio">Fecha de la toma *</label>
+                <input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}" max="${hoy}" required>
+            </div>
+        `;
+        ayuda = '💊 <b>Puntual</b>: una sola toma específica (ej: paracetamol hoy)';
+    } else if (tipo === 'regular') {
+        // Solo fecha de inicio (sin fin porque es indefinido)
+        html = `
+            <div class="form-group">
+                <label for="med-fecha-inicio">Tomándolo desde *</label>
+                <input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}" max="${hoy}" required>
+                <small style="color: var(--texto-secundario); font-size: 12px;">Si no recuerdas la fecha exacta, deja la de hoy</small>
+            </div>
+        `;
+        ayuda = '🔄 <b>Regular/Crónico</b>: tratamiento indefinido (ej: rinitis crónica). Sin fecha de fin — lo finalizas manualmente cuando termine';
+    } else if (tipo === 'asociado_enfermedad') {
+        // Inicio + fin obligatorio
+        html = `
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="med-fecha-inicio">Inicio *</label>
+                    <input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}" required>
+                </div>
+                <div class="form-group">
+                    <label for="med-fecha-fin">Fin *</label>
+                    <input type="date" id="med-fecha-fin" class="form-input" required>
+                </div>
+            </div>
+        `;
+        ayuda = '🤒 <b>Por enfermedad</b>: tratamiento con duración definida (ej: antibiótico por 7 días)';
+    }
+
+    container.innerHTML = html;
+    if (ayudaEl) ayudaEl.innerHTML = ayuda;
+};
 
 // Renderizar selector de miembros
 function renderizarSelectorMiembros(miembros, miembroPreseleccionado = null) {
@@ -184,7 +258,7 @@ window.seleccionarMiembro = function(id) {
 
 // Construir <select> de especialidades
 function selectEspecialidades(idCampo = 'evt-especialidad') {
-    let html = `<select id="${idCampo}" class="form-input" onchange="toggleEspecialidadOtra(this, '${idCampo}-otra')">`;
+    let html = `<select id="${idCampo}" class="form-input" onchange="toggleSelectOtra(this, '${idCampo}-otra')">`;
     html += '<option value="">Seleccionar...</option>';
     ESPECIALIDADES.forEach(e => {
         html += `<option value="${e}">${e}</option>`;
@@ -194,9 +268,21 @@ function selectEspecialidades(idCampo = 'evt-especialidad') {
     return html;
 }
 
-window.toggleEspecialidadOtra = function(selectEl, otraId) {
+// Construir <select> de centros médicos
+function selectCentrosMedicos(idCampo = 'evt-centro') {
+    let html = `<select id="${idCampo}" class="form-input" onchange="toggleSelectOtra(this, '${idCampo}-otra')">`;
+    html += '<option value="">Seleccionar...</option>';
+    CENTROS_MEDICOS.forEach(c => {
+        html += `<option value="${c}">${c}</option>`;
+    });
+    html += '</select>';
+    html += `<input type="text" id="${idCampo}-otra" class="form-input" placeholder="Especifica el centro médico" style="display: none; margin-top: 8px;">`;
+    return html;
+}
+
+window.toggleSelectOtra = function(selectEl, otraId) {
     const otraEl = document.getElementById(otraId);
-    if (selectEl.value === 'Otra') {
+    if (selectEl.value === 'Otra' || selectEl.value === 'Otro') {
         otraEl.style.display = 'block';
         otraEl.focus();
     } else {
@@ -204,6 +290,9 @@ window.toggleEspecialidadOtra = function(selectEl, otraId) {
         otraEl.value = '';
     }
 };
+
+// Compatibilidad hacia atrás (función vieja)
+window.toggleEspecialidadOtra = window.toggleSelectOtra;
 
 // Renderizar campos según tipo elegido
 function renderizarFormularioCampos(tipo) {
@@ -286,9 +375,9 @@ function renderizarFormularioCampos(tipo) {
         html += `<div class="form-group"><label for="evt-especialidad">Especialidad</label>${selectEspecialidades('evt-especialidad')}</div>`;
     }
 
-    // Centro médico
+    // Centro médico (dropdown con "Otro")
     if (campos.includes('centro_medico')) {
-        html += `<div class="form-group"><label for="evt-centro">Centro médico</label><input type="text" id="evt-centro" class="form-input" placeholder="Ej: Clínica Las Condes"></div>`;
+        html += `<div class="form-group"><label for="evt-centro">Centro médico</label>${selectCentrosMedicos('evt-centro')}</div>`;
     }
 
     // Diagnóstico
@@ -325,7 +414,7 @@ function renderizarFormularioCampos(tipo) {
         html += `<div class="form-group"><label for="evt-interpretacion">Interpretación / observaciones</label><textarea id="evt-interpretacion" class="form-input form-textarea" rows="2"></textarea></div>`;
     }
 
-    // MEDICAMENTO COMPLETO (sin duplicado de título)
+    // MEDICAMENTO COMPLETO (campos dinámicos según tipo de uso)
     if (campos.includes('MEDICAMENTO_FULL')) {
         html += `
             <div class="form-group">
@@ -340,17 +429,16 @@ function renderizarFormularioCampos(tipo) {
             <div class="form-group">
                 <label>Tipo de uso *</label>
                 <div class="severidad-opciones">
-                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="puntual" checked><span>💊 Puntual</span></label>
-                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="regular"><span>🔄 Regular/Crónico</span></label>
-                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="asociado_enfermedad"><span>🤒 Por enfermedad</span></label>
+                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="puntual" onchange="actualizarCamposMedicamento()" checked><span>💊 Puntual</span></label>
+                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="regular" onchange="actualizarCamposMedicamento()"><span>🔄 Regular/Crónico</span></label>
+                    <label class="severidad-opcion"><input type="radio" name="med-tipo" value="asociado_enfermedad" onchange="actualizarCamposMedicamento()"><span>🤒 Por enfermedad</span></label>
                 </div>
-                <small style="color: var(--texto-secundario); font-size: 12px; display: block; margin-top: 8px;">
-                    <b>Puntual</b>: una toma específica · <b>Regular</b>: en curso indefinido · <b>Por enfermedad</b>: tratamiento con duración
+                <small id="med-tipo-ayuda" style="color: var(--texto-secundario); font-size: 12px; display: block; margin-top: 8px;">
+                    💊 <b>Puntual</b>: una sola toma específica
                 </small>
             </div>
-            <div class="form-grid-2">
-                <div class="form-group"><label for="med-fecha-inicio">Inicio *</label><input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}" required></div>
-                <div class="form-group"><label for="med-fecha-fin">Fin (opcional)</label><input type="date" id="med-fecha-fin" class="form-input"></div>
+            <div id="med-fechas-container">
+                <!-- Las fechas se renderizan dinámicamente según el tipo -->
             </div>
             <div class="form-group"><label for="med-motivo">Motivo</label><input type="text" id="med-motivo" class="form-input" placeholder="Ej: Rinitis crónica"></div>
             <div class="form-group"><label for="med-recetado-por">Recetado por (opcional)</label><input type="text" id="med-recetado-por" class="form-input"></div>
@@ -413,24 +501,36 @@ function renderizarFormularioCampos(tipo) {
     cont.innerHTML = html;
 }
 
-// Helper: leer valor de especialidad considerando "Otra"
-function leerEspecialidad(idCampo = 'evt-especialidad') {
+// Helper: leer valor de un select con campo "Otra/Otro"
+function leerCampoConOtra(idCampo) {
     const select = document.getElementById(idCampo);
     if (!select) return null;
-    if (select.value === 'Otra') {
+    const valor = select.value;
+    if (valor === 'Otra' || valor === 'Otro') {
         const otra = document.getElementById(idCampo + '-otra');
         return otra?.value.trim() || null;
     }
-    return select.value || null;
+    return valor || null;
+}
+
+// Compatibilidad
+function leerEspecialidad(idCampo = 'evt-especialidad') {
+    return leerCampoConOtra(idCampo);
 }
 
 // Validar lógica de fechas
 function validarFechas(tipo) {
     if (tipo === 'medicamento') {
-        const inicio = document.getElementById('med-fecha-inicio')?.value;
-        const fin = document.getElementById('med-fecha-fin')?.value;
-        if (inicio && fin && fin < inicio) {
-            return 'La fecha de fin no puede ser anterior al inicio';
+        const tipoMedEl = document.querySelector('input[name="med-tipo"]:checked');
+        const tipoMed = tipoMedEl ? tipoMedEl.value : 'puntual';
+
+        if (tipoMed === 'asociado_enfermedad') {
+            const inicio = document.getElementById('med-fecha-inicio')?.value;
+            const fin = document.getElementById('med-fecha-fin')?.value;
+            if (!fin) return 'Para tratamientos por enfermedad debes indicar fecha de fin';
+            if (inicio && fin && fin < inicio) {
+                return 'La fecha de fin no puede ser anterior al inicio';
+            }
         }
     }
     if (tipo === 'hospitalizacion') {
@@ -512,8 +612,8 @@ async function guardarEvento() {
             const consultaData = {
                 evento_id: evento.id,
                 medico_nombre: document.getElementById('evt-medico')?.value.trim() || null,
-                especialidad: leerEspecialidad('evt-especialidad'),
-                centro_medico: document.getElementById('evt-centro')?.value.trim() || null,
+                especialidad: leerCampoConOtra('evt-especialidad'),
+                centro_medico: leerCampoConOtra('evt-centro'),
                 diagnostico: document.getElementById('evt-diagnostico')?.value.trim() || null,
                 indicaciones: document.getElementById('evt-indicaciones')?.value.trim() || null,
                 proximo_control: document.getElementById('evt-proximo')?.value || null
@@ -559,12 +659,17 @@ async function guardarEvento() {
         if (campos.includes('MEDICAMENTO_FULL')) {
             const tipoMedEl = document.querySelector('input[name="med-tipo"]:checked');
             const tipoMed = tipoMedEl ? tipoMedEl.value : 'puntual';
-            const fechaFin = document.getElementById('med-fecha-fin')?.value || null;
+            const fechaFinEl = document.getElementById('med-fecha-fin');
+            const fechaFin = fechaFinEl ? (fechaFinEl.value || null) : null;
             const hoy = new Date().toISOString().split('T')[0];
 
+            // Lógica de "en curso":
+            // - Puntual: nunca en curso (es una toma)
+            // - Regular: en curso siempre (hasta finalizar manualmente)
+            // - Por enfermedad: en curso si fecha fin >= hoy
             let enCurso = false;
             if (tipoMed === 'regular') {
-                enCurso = !fechaFin || fechaFin >= hoy;
+                enCurso = true; // Siempre en curso hasta finalizar manualmente
             } else if (tipoMed === 'asociado_enfermedad') {
                 enCurso = fechaFin ? fechaFin >= hoy : true;
             }
