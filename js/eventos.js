@@ -1,6 +1,31 @@
 // =====================================================
-// SALUD MARRANA - Registro de eventos
+// SALUD MARRANA - Registro de eventos (v2 con mejoras)
 // =====================================================
+
+// Lista de especialidades médicas comunes en Chile
+const ESPECIALIDADES = [
+    'Pediatría',
+    'Medicina general',
+    'Medicina interna',
+    'Dermatología',
+    'Ginecología',
+    'Reumatología',
+    'Traumatología',
+    'Oftalmología',
+    'Otorrinolaringología',
+    'Cardiología',
+    'Endocrinología',
+    'Neurología',
+    'Psiquiatría',
+    'Psicología',
+    'Nutricionista',
+    'Odontología',
+    'Kinesiología',
+    'Fonoaudiología',
+    'Urología',
+    'Gastroenterología',
+    'Otra'
+];
 
 // Definición de campos según tipo de evento
 const CAMPOS_POR_TIPO = {
@@ -15,7 +40,7 @@ const CAMPOS_POR_TIPO = {
         emoji: '👩‍⚕️',
         etiqueta: 'Consulta médica',
         descripcionPlaceholder: 'Motivo y observaciones generales',
-        camposExtra: ['medico_nombre', 'especialidad', 'centro_medico', 'diagnostico', 'indicaciones', 'proximo_control', 'costo_clp'],
+        camposExtra: ['medico_nombre', 'especialidad', 'centro_medico', 'diagnostico', 'indicaciones', 'proximo_control'],
         sugerenciasTitulo: ['Consulta general', 'Pediatría', 'Control', 'Urgencia', 'Especialista']
     },
     examen: {
@@ -29,7 +54,7 @@ const CAMPOS_POR_TIPO = {
         emoji: '💊',
         etiqueta: 'Medicamento',
         descripcionPlaceholder: 'Detalle de la toma o tratamiento',
-        camposExtra: ['med_nombre', 'med_dosis', 'med_frecuencia', 'med_via', 'med_tipo', 'med_fecha_inicio', 'med_fecha_fin', 'med_motivo', 'med_recetado_por'],
+        camposExtra: ['MEDICAMENTO_FULL'],
         sugerenciasTitulo: ['Paracetamol', 'Ibuprofeno', 'Antihistamínico', 'Antibiótico', 'Loratadina', 'Cetirizina']
     },
     vacuna: {
@@ -43,7 +68,7 @@ const CAMPOS_POR_TIPO = {
         emoji: '🏥',
         etiqueta: 'Hospitalización / urgencia',
         descripcionPlaceholder: 'Motivo y detalles',
-        camposExtra: ['centro_medico', 'diagnostico'],
+        camposExtra: ['centro_medico', 'diagnostico', 'fecha_alta'],
         sugerenciasTitulo: ['Urgencia', 'Hospitalización', 'Cirugía']
     },
     control_preventivo: {
@@ -85,7 +110,7 @@ const CAMPOS_POR_TIPO = {
         emoji: '🧠',
         etiqueta: 'Salud mental',
         descripcionPlaceholder: 'Detalle del estado o sesión',
-        camposExtra: ['medico_nombre', 'centro_medico', 'severidad'],
+        camposExtra: ['medico_nombre', 'centro_medico', 'estado_mental'],
         sugerenciasTitulo: ['Sesión psicología', 'Crisis ansiedad', 'Estado ánimo', 'Estrés', 'Control psiquiatra']
     }
 };
@@ -134,7 +159,8 @@ function renderizarSelectorMiembros(miembros, miembroPreseleccionado = null) {
 const formState = {
     miembroId: null,
     tipo: null,
-    miembros: []
+    miembros: [],
+    eventoIdEditando: null
 };
 
 window.seleccionarTipo = function(tipo) {
@@ -142,7 +168,6 @@ window.seleccionarTipo = function(tipo) {
     document.querySelectorAll('.tipo-card').forEach(c => c.classList.remove('seleccionado'));
     document.querySelector(`.tipo-card[data-tipo="${tipo}"]`).classList.add('seleccionado');
 
-    // Mostrar paso 3 (formulario)
     renderizarFormularioCampos(tipo);
     document.getElementById('paso-3').style.display = 'block';
     document.getElementById('paso-3').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -153,9 +178,31 @@ window.seleccionarMiembro = function(id) {
     document.querySelectorAll('.miembro-chip').forEach(c => c.classList.remove('seleccionado'));
     document.querySelector(`.miembro-chip[data-id="${id}"]`).classList.add('seleccionado');
 
-    // Mostrar paso 2 (tipos)
     document.getElementById('paso-2').style.display = 'block';
     document.getElementById('paso-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// Construir <select> de especialidades
+function selectEspecialidades(idCampo = 'evt-especialidad') {
+    let html = `<select id="${idCampo}" class="form-input" onchange="toggleEspecialidadOtra(this, '${idCampo}-otra')">`;
+    html += '<option value="">Seleccionar...</option>';
+    ESPECIALIDADES.forEach(e => {
+        html += `<option value="${e}">${e}</option>`;
+    });
+    html += '</select>';
+    html += `<input type="text" id="${idCampo}-otra" class="form-input" placeholder="Especifica la especialidad" style="display: none; margin-top: 8px;">`;
+    return html;
+}
+
+window.toggleEspecialidadOtra = function(selectEl, otraId) {
+    const otraEl = document.getElementById(otraId);
+    if (selectEl.value === 'Otra') {
+        otraEl.style.display = 'block';
+        otraEl.focus();
+    } else {
+        otraEl.style.display = 'none';
+        otraEl.value = '';
+    }
 };
 
 // Renderizar campos según tipo elegido
@@ -163,8 +210,9 @@ function renderizarFormularioCampos(tipo) {
     const def = CAMPOS_POR_TIPO[tipo];
     const cont = document.getElementById('campos-extra');
     const hoy = new Date().toISOString().split('T')[0];
+    const esMedicamento = tipo === 'medicamento';
 
-    // Construir datalist de sugerencias
+    // Datalist de sugerencias
     const datalistId = 'sugerencias-titulo';
     const datalist = `
         <datalist id="${datalistId}">
@@ -172,32 +220,35 @@ function renderizarFormularioCampos(tipo) {
         </datalist>
     `;
 
-    // Campos comunes
-    let html = `
-        ${datalist}
-        <div class="form-group">
-            <label for="evt-titulo">Título *</label>
-            <input type="text" id="evt-titulo" class="form-input" list="${datalistId}" placeholder="Ej: ${def.sugerenciasTitulo[0]}" required>
-        </div>
-        <div class="form-grid-2">
-            <div class="form-group">
-                <label for="evt-fecha">Fecha *</label>
-                <input type="date" id="evt-fecha" class="form-input" value="${hoy}" required>
-            </div>
-            <div class="form-group">
-                <label for="evt-hora">Hora (opcional)</label>
-                <input type="time" id="evt-hora" class="form-input">
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="evt-descripcion">Descripción</label>
-            <textarea id="evt-descripcion" class="form-input form-textarea" placeholder="${def.descripcionPlaceholder}" rows="3"></textarea>
-        </div>
-    `;
+    let html = datalist;
 
-    // Campos específicos
+    // CAMPOS COMUNES (excepto en medicamento que tiene su propio bloque)
+    if (!esMedicamento) {
+        html += `
+            <div class="form-group">
+                <label for="evt-titulo">Título *</label>
+                <input type="text" id="evt-titulo" class="form-input" list="${datalistId}" placeholder="Ej: ${def.sugerenciasTitulo[0]}" required>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="evt-fecha">Fecha *</label>
+                    <input type="date" id="evt-fecha" class="form-input" value="${hoy}" max="${hoy}" required>
+                </div>
+                <div class="form-group">
+                    <label for="evt-hora">Hora (opcional)</label>
+                    <input type="time" id="evt-hora" class="form-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="evt-descripcion">Descripción</label>
+                <textarea id="evt-descripcion" class="form-input form-textarea" placeholder="${def.descripcionPlaceholder}" rows="3"></textarea>
+            </div>
+        `;
+    }
+
     const campos = def.camposExtra;
 
+    // Severidad
     if (campos.includes('severidad')) {
         html += `
             <div class="form-group">
@@ -211,27 +262,53 @@ function renderizarFormularioCampos(tipo) {
         `;
     }
 
-    // Consulta médica / preventiva / tratamiento
+    // Estado mental (variante de severidad para salud mental)
+    if (campos.includes('estado_mental')) {
+        html += `
+            <div class="form-group">
+                <label>Estado general</label>
+                <div class="severidad-opciones">
+                    <label class="severidad-opcion"><input type="radio" name="severidad" value="leve" checked><span>🟢 Estable</span></label>
+                    <label class="severidad-opcion"><input type="radio" name="severidad" value="moderado"><span>🟡 Inquieto</span></label>
+                    <label class="severidad-opcion"><input type="radio" name="severidad" value="severo"><span>🔴 Crítico</span></label>
+                </div>
+            </div>
+        `;
+    }
+
+    // Médico
     if (campos.includes('medico_nombre')) {
         html += `<div class="form-group"><label for="evt-medico">Médico/profesional</label><input type="text" id="evt-medico" class="form-input" placeholder="Dr/a. Nombre Apellido"></div>`;
     }
+
+    // Especialidad (dropdown)
     if (campos.includes('especialidad')) {
-        html += `<div class="form-group"><label for="evt-especialidad">Especialidad</label><input type="text" id="evt-especialidad" class="form-input" placeholder="Ej: Pediatría, Dermatología"></div>`;
+        html += `<div class="form-group"><label for="evt-especialidad">Especialidad</label>${selectEspecialidades('evt-especialidad')}</div>`;
     }
+
+    // Centro médico
     if (campos.includes('centro_medico')) {
         html += `<div class="form-group"><label for="evt-centro">Centro médico</label><input type="text" id="evt-centro" class="form-input" placeholder="Ej: Clínica Las Condes"></div>`;
     }
+
+    // Diagnóstico
     if (campos.includes('diagnostico')) {
         html += `<div class="form-group"><label for="evt-diagnostico">Diagnóstico</label><textarea id="evt-diagnostico" class="form-input form-textarea" rows="2"></textarea></div>`;
     }
+
+    // Indicaciones
     if (campos.includes('indicaciones')) {
         html += `<div class="form-group"><label for="evt-indicaciones">Indicaciones</label><textarea id="evt-indicaciones" class="form-input form-textarea" rows="2"></textarea></div>`;
     }
+
+    // Próximo control
     if (campos.includes('proximo_control')) {
-        html += `<div class="form-group"><label for="evt-proximo">Próximo control (opcional)</label><input type="date" id="evt-proximo" class="form-input"><small style="color: var(--texto-secundario); font-size: 12px;">Si lo agregas, se crea un recordatorio automático</small></div>`;
+        html += `<div class="form-group"><label for="evt-proximo">Próximo control (opcional)</label><input type="date" id="evt-proximo" class="form-input" min="${hoy}"><small style="color: var(--texto-secundario); font-size: 12px;">Si lo agregas, se crea un recordatorio automático</small></div>`;
     }
-    if (campos.includes('costo_clp')) {
-        html += `<div class="form-group"><label for="evt-costo">Costo (CLP)</label><input type="number" id="evt-costo" class="form-input" placeholder="0"></div>`;
+
+    // Fecha de alta (hospitalización)
+    if (campos.includes('fecha_alta')) {
+        html += `<div class="form-group"><label for="evt-fecha-alta">Fecha de alta (opcional)</label><input type="date" id="evt-fecha-alta" class="form-input" max="${hoy}"></div>`;
     }
 
     // Examen
@@ -248,10 +325,13 @@ function renderizarFormularioCampos(tipo) {
         html += `<div class="form-group"><label for="evt-interpretacion">Interpretación / observaciones</label><textarea id="evt-interpretacion" class="form-input form-textarea" rows="2"></textarea></div>`;
     }
 
-    // Medicamento
-    if (campos.includes('med_nombre')) {
+    // MEDICAMENTO COMPLETO (sin duplicado de título)
+    if (campos.includes('MEDICAMENTO_FULL')) {
         html += `
-            <div class="form-group"><label for="med-nombre">Nombre del medicamento *</label><input type="text" id="med-nombre" class="form-input" list="sugerencias-titulo" required></div>
+            <div class="form-group">
+                <label for="med-nombre">Nombre del medicamento *</label>
+                <input type="text" id="med-nombre" class="form-input" list="${datalistId}" placeholder="Ej: Loratadina" required>
+            </div>
             <div class="form-grid-2">
                 <div class="form-group"><label for="med-dosis">Dosis</label><input type="text" id="med-dosis" class="form-input" placeholder="500mg"></div>
                 <div class="form-group"><label for="med-frecuencia">Frecuencia</label><input type="text" id="med-frecuencia" class="form-input" placeholder="cada 8h"></div>
@@ -269,11 +349,15 @@ function renderizarFormularioCampos(tipo) {
                 </small>
             </div>
             <div class="form-grid-2">
-                <div class="form-group"><label for="med-fecha-inicio">Inicio</label><input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}"></div>
+                <div class="form-group"><label for="med-fecha-inicio">Inicio *</label><input type="date" id="med-fecha-inicio" class="form-input" value="${hoy}" required></div>
                 <div class="form-group"><label for="med-fecha-fin">Fin (opcional)</label><input type="date" id="med-fecha-fin" class="form-input"></div>
             </div>
             <div class="form-group"><label for="med-motivo">Motivo</label><input type="text" id="med-motivo" class="form-input" placeholder="Ej: Rinitis crónica"></div>
             <div class="form-group"><label for="med-recetado-por">Recetado por (opcional)</label><input type="text" id="med-recetado-por" class="form-input"></div>
+            <div class="form-group">
+                <label for="med-descripcion">Notas (opcional)</label>
+                <textarea id="med-descripcion" class="form-input form-textarea" placeholder="Detalle adicional" rows="2"></textarea>
+            </div>
         `;
     }
 
@@ -309,16 +393,54 @@ function renderizarFormularioCampos(tipo) {
         `;
     }
 
-    // Tags libres (siempre disponibles)
+    // ACORDEÓN: opciones avanzadas (etiquetas)
     html += `
-        <div class="form-group">
-            <label for="evt-tags">Etiquetas (opcional)</label>
-            <input type="text" id="evt-tags" class="form-input" placeholder="Ej: invierno, colegio, alergia (separadas por coma)">
-            <small style="color: var(--texto-secundario); font-size: 12px;">Útiles para filtrar después</small>
+        <div class="acordeon">
+            <button type="button" class="acordeon-trigger" onclick="this.parentElement.classList.toggle('abierto')">
+                <span>⚙️ Más opciones</span>
+                <span class="acordeon-icono">▼</span>
+            </button>
+            <div class="acordeon-contenido">
+                <div class="form-group">
+                    <label for="evt-tags">Etiquetas</label>
+                    <input type="text" id="evt-tags" class="form-input" placeholder="Ej: invierno, colegio (separadas por coma)">
+                    <small style="color: var(--texto-secundario); font-size: 12px;">Útiles para filtrar después</small>
+                </div>
+            </div>
         </div>
     `;
 
     cont.innerHTML = html;
+}
+
+// Helper: leer valor de especialidad considerando "Otra"
+function leerEspecialidad(idCampo = 'evt-especialidad') {
+    const select = document.getElementById(idCampo);
+    if (!select) return null;
+    if (select.value === 'Otra') {
+        const otra = document.getElementById(idCampo + '-otra');
+        return otra?.value.trim() || null;
+    }
+    return select.value || null;
+}
+
+// Validar lógica de fechas
+function validarFechas(tipo) {
+    if (tipo === 'medicamento') {
+        const inicio = document.getElementById('med-fecha-inicio')?.value;
+        const fin = document.getElementById('med-fecha-fin')?.value;
+        if (inicio && fin && fin < inicio) {
+            return 'La fecha de fin no puede ser anterior al inicio';
+        }
+    }
+    if (tipo === 'hospitalizacion') {
+        const fecha = document.getElementById('evt-fecha')?.value;
+        const alta = document.getElementById('evt-fecha-alta')?.value;
+        if (fecha && alta && alta < fecha) {
+            return 'La fecha de alta no puede ser anterior al ingreso';
+        }
+    }
+    return null;
 }
 
 // Guardar el evento
@@ -330,15 +452,23 @@ async function guardarEvento() {
     if (!miembroId) return mostrarToast('Falta elegir el miembro', 'error');
     if (!tipo) return mostrarToast('Falta elegir el tipo de evento', 'error');
 
-    const titulo = document.getElementById('evt-titulo').value.trim();
-    const fecha = document.getElementById('evt-fecha').value;
+    const errorFechas = validarFechas(tipo);
+    if (errorFechas) return mostrarToast(errorFechas, 'error');
 
-    // Para medicamentos, el "título" lo construimos del nombre del medicamento
-    let tituloFinal = titulo;
+    let tituloFinal, fecha, hora, descripcion;
+
     if (tipo === 'medicamento') {
         const medNombre = document.getElementById('med-nombre')?.value.trim();
         if (!medNombre) return mostrarToast('Falta el nombre del medicamento', 'error');
-        tituloFinal = titulo || medNombre;
+        tituloFinal = medNombre;
+        fecha = document.getElementById('med-fecha-inicio')?.value;
+        hora = null;
+        descripcion = document.getElementById('med-descripcion')?.value.trim() || null;
+    } else {
+        tituloFinal = document.getElementById('evt-titulo')?.value.trim();
+        fecha = document.getElementById('evt-fecha')?.value;
+        hora = document.getElementById('evt-hora')?.value || null;
+        descripcion = document.getElementById('evt-descripcion')?.value.trim() || null;
     }
 
     if (!tituloFinal) return mostrarToast('Falta el título', 'error');
@@ -348,7 +478,6 @@ async function guardarEvento() {
     btn.innerHTML = '<span class="spinner"></span> Guardando...';
 
     try {
-        // 1. Crear el evento principal
         const tagsInput = document.getElementById('evt-tags')?.value.trim();
         const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : null;
 
@@ -358,9 +487,9 @@ async function guardarEvento() {
             miembro_id: miembroId,
             tipo,
             fecha,
-            hora: document.getElementById('evt-hora').value || null,
+            hora,
             titulo: tituloFinal,
-            descripcion: document.getElementById('evt-descripcion').value.trim() || null,
+            descripcion,
             severidad: severidadEl ? severidadEl.value : null,
             metodo_registro: 'formulario',
             tags
@@ -374,7 +503,6 @@ async function guardarEvento() {
 
         if (errEvt) throw errEvt;
 
-        // 2. Insertar detalle según tipo
         const def = CAMPOS_POR_TIPO[tipo];
         const campos = def.camposExtra;
 
@@ -384,16 +512,14 @@ async function guardarEvento() {
             const consultaData = {
                 evento_id: evento.id,
                 medico_nombre: document.getElementById('evt-medico')?.value.trim() || null,
-                especialidad: document.getElementById('evt-especialidad')?.value.trim() || null,
+                especialidad: leerEspecialidad('evt-especialidad'),
                 centro_medico: document.getElementById('evt-centro')?.value.trim() || null,
                 diagnostico: document.getElementById('evt-diagnostico')?.value.trim() || null,
                 indicaciones: document.getElementById('evt-indicaciones')?.value.trim() || null,
-                proximo_control: document.getElementById('evt-proximo')?.value || null,
-                costo_clp: document.getElementById('evt-costo')?.value ? parseInt(document.getElementById('evt-costo').value) : null
+                proximo_control: document.getElementById('evt-proximo')?.value || null
             };
             await sb.from('consultas_medicas').insert(consultaData);
 
-            // Si hay próximo control, crear recordatorio
             if (consultaData.proximo_control) {
                 await sb.from('recordatorios').insert({
                     miembro_id: miembroId,
@@ -402,6 +528,18 @@ async function guardarEvento() {
                     fecha: consultaData.proximo_control,
                     tipo: 'control'
                 });
+                mostrarToast(`Recordatorio creado para ${formatearFechaCorta(consultaData.proximo_control)} 📌`, 'exito');
+            }
+        }
+
+        // Hospitalización (fecha de alta)
+        if (campos.includes('fecha_alta')) {
+            const fechaAlta = document.getElementById('evt-fecha-alta')?.value;
+            if (fechaAlta) {
+                // Guardamos fecha de alta en descripción anexa
+                await sb.from('eventos')
+                    .update({ descripcion: (descripcion ? descripcion + '\n' : '') + `Alta: ${formatearFechaCorta(fechaAlta)}` })
+                    .eq('id', evento.id);
             }
         }
 
@@ -418,18 +556,17 @@ async function guardarEvento() {
         }
 
         // Medicamento
-        if (campos.includes('med_nombre')) {
+        if (campos.includes('MEDICAMENTO_FULL')) {
             const tipoMedEl = document.querySelector('input[name="med-tipo"]:checked');
             const tipoMed = tipoMedEl ? tipoMedEl.value : 'puntual';
             const fechaFin = document.getElementById('med-fecha-fin')?.value || null;
-
-            // En curso si es regular sin fecha fin, o asociado a enfermedad con fecha fin futura
-            let enCurso = false;
             const hoy = new Date().toISOString().split('T')[0];
+
+            let enCurso = false;
             if (tipoMed === 'regular') {
                 enCurso = !fechaFin || fechaFin >= hoy;
             } else if (tipoMed === 'asociado_enfermedad') {
-                enCurso = fechaFin && fechaFin >= hoy;
+                enCurso = fechaFin ? fechaFin >= hoy : true;
             }
 
             await sb.from('medicamentos').insert({
@@ -483,14 +620,65 @@ async function guardarEvento() {
 
         mostrarToast('Evento registrado ✅', 'exito');
 
-        // Redirigir al perfil del miembro
         setTimeout(() => {
             window.location.href = `perfil.html?id=${miembroId}`;
-        }, 1000);
+        }, 1200);
     } catch (err) {
         console.error('Error guardando evento:', err);
         mostrarToast('Error al guardar: ' + err.message, 'error');
         btn.disabled = false;
         btn.textContent = 'Guardar evento';
+    }
+}
+
+// =====================================================
+// FINALIZAR MEDICAMENTO EN CURSO
+// =====================================================
+async function finalizarMedicamento(medicamentoId, miembroId) {
+    if (!confirm('¿Marcar este medicamento como finalizado?')) return;
+
+    const hoy = new Date().toISOString().split('T')[0];
+
+    try {
+        const { error } = await sb
+            .from('medicamentos')
+            .update({
+                en_curso: false,
+                fecha_fin: hoy
+            })
+            .eq('id', medicamentoId);
+
+        if (error) throw error;
+
+        mostrarToast('Medicamento finalizado ✅', 'exito');
+        setTimeout(() => location.reload(), 800);
+    } catch (err) {
+        console.error(err);
+        mostrarToast('Error al finalizar', 'error');
+    }
+}
+
+// =====================================================
+// ELIMINAR EVENTO
+// =====================================================
+async function eliminarEvento(eventoId, miembroId) {
+    if (!confirm('¿Eliminar este evento? Esta acción no se puede deshacer.')) return;
+
+    try {
+        // ON DELETE CASCADE elimina los detalles asociados (consultas, medicamentos, etc.)
+        const { error } = await sb
+            .from('eventos')
+            .delete()
+            .eq('id', eventoId);
+
+        if (error) throw error;
+
+        mostrarToast('Evento eliminado', 'exito');
+        setTimeout(() => {
+            window.location.href = `perfil.html?id=${miembroId}`;
+        }, 800);
+    } catch (err) {
+        console.error(err);
+        mostrarToast('Error al eliminar', 'error');
     }
 }
