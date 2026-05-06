@@ -20,6 +20,15 @@
                 <p>Bitácora de salud familiar</p>
             </div>
 
+            <!-- Botón destacado de voz -->
+            <button class="btn-voz-destacado" onclick="abrirModalVoz()">
+                <span class="btn-voz-icono">🎤</span>
+                <div class="btn-voz-texto">
+                    <strong>Registro rápido por voz</strong>
+                    <small>Cuéntame qué pasó y lo registro al toque</small>
+                </div>
+            </button>
+
             <div class="seccion">
                 <div class="seccion-titulo">La familia</div>
                 <div id="loading-miembros" class="loading-pantalla" style="min-height: 200px;">
@@ -53,27 +62,26 @@
         </main>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/eventos.js"></script>
+    <script src="js/voz.js"></script>
 
     <script>
         (async () => {
             const ok = await protegerPagina();
             if (!ok) return;
 
-            // Saludo según hora del día
             const hora = new Date().getHours();
             const saludoEl = document.getElementById('saludo');
             if (hora < 12) saludoEl.textContent = 'Buenos días 👋';
             else if (hora < 19) saludoEl.textContent = 'Buenas tardes 👋';
             else saludoEl.textContent = 'Buenas noches 👋';
 
-            // Cargar dashboard
             await renderizarDashboard();
         })();
     </script>
