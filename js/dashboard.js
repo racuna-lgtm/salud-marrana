@@ -20,7 +20,7 @@ async function cargarAlertasMiembro(miembroId) {
     const alertas = [];
     const hoy = new Date().toISOString().split('T')[0];
 
-    // Medicamentos en curso
+    // Medicamentos en curso (con nombre del primero)
     const { data: meds } = await sb
         .from('medicamentos')
         .select('nombre')
@@ -28,9 +28,15 @@ async function cargarAlertasMiembro(miembroId) {
         .eq('en_curso', true);
 
     if (meds && meds.length > 0) {
+        let texto;
+        if (meds.length === 1) {
+            texto = `💊 ${meds[0].nombre}`;
+        } else {
+            texto = `💊 ${meds[0].nombre} +${meds.length - 1} más`;
+        }
         alertas.push({
             tipo: 'medicamento',
-            texto: `💊 ${meds.length} medicamento${meds.length > 1 ? 's' : ''} en curso`,
+            texto,
             urgencia: 'normal'
         });
     }
