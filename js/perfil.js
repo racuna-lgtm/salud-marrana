@@ -104,15 +104,19 @@ function renderizarPerfil(datos) {
     // Medicamentos en curso
     const medsEl = document.getElementById('medicamentos-curso');
     if (medicamentos.length > 0) {
-        medsEl.innerHTML = `
-            <h4>💊 Medicamentos en curso</h4>
-            ${medicamentos.map(m => `
-                <div class="info-row">
-                    <span class="etiqueta">${m.nombre}</span>
-                    <span class="valor">${m.dosis || ''} ${m.frecuencia ? '· ' + m.frecuencia : ''}</span>
+        let medsHtml = '<h4>💊 Medicamentos en curso</h4>';
+        medicamentos.forEach(m => {
+            medsHtml += `
+                <div class="medicamento-curso-row">
+                    <div class="medicamento-curso-info">
+                        <div class="nombre">${m.nombre}</div>
+                        <div class="detalle">${m.dosis || ''} ${m.frecuencia ? '· ' + m.frecuencia : ''}${m.motivo ? ' · ' + m.motivo : ''}</div>
+                    </div>
+                    <button class="btn-finalizar-mini" onclick="finalizarMedicamento('${m.id}', '${miembro.id}')">✓ Finalizar</button>
                 </div>
-            `).join('')}
-        `;
+            `;
+        });
+        medsEl.innerHTML = medsHtml;
         medsEl.style.display = 'block';
     } else {
         medsEl.style.display = 'none';
@@ -148,9 +152,9 @@ function renderizarPerfil(datos) {
         eventosEl.innerHTML = `
             <h4>Últimos eventos</h4>
             ${eventos.map(e => `
-                <div class="info-row">
+                <div class="info-row evento-clickeable" onclick="window.location.href='evento.html?id=${e.id}'">
                     <span class="etiqueta">${etiquetaTipoEvento(e.tipo)}<br><small style="font-size: 11px; color: var(--texto-secundario);">${e.titulo}</small></span>
-                    <span class="valor">${formatearFechaCorta(e.fecha)}</span>
+                    <span class="valor">${formatearFechaCorta(e.fecha)} ›</span>
                 </div>
             `).join('')}
         `;
