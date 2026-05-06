@@ -17,15 +17,39 @@
 
         <main class="app-content">
             <div class="card-bienvenida">
-                <h2>¡Conectado! 🎉</h2>
-                <p>Si ves este mensaje, la autenticación con Supabase funciona perfecto.</p>
+                <h2 id="saludo">Hola 👋</h2>
+                <p>Bitácora de salud familiar</p>
             </div>
 
-            <div id="info-conexion" style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--sombra-sm);">
-                <p style="font-size: 13px; color: var(--texto-secundario); margin-bottom: 10px;">
-                    <strong>Estado de conexión:</strong>
-                </p>
-                <div id="estado-supabase">Verificando...</div>
+            <div class="seccion">
+                <div class="seccion-titulo">La familia</div>
+                <div id="loading-miembros" class="loading-pantalla" style="min-height: 200px;">
+                    <div class="spinner-grande"></div>
+                    <p>Cargando familia...</p>
+                </div>
+                <div class="miembros-grid" id="miembros-grid"></div>
+            </div>
+
+            <div class="seccion">
+                <div class="seccion-titulo">Acciones rápidas</div>
+                <div class="acciones-rapidas">
+                    <button class="btn-accion" onclick="alert('Próximo paso 👀')">
+                        <span class="emoji">➕</span>
+                        Nuevo evento
+                    </button>
+                    <button class="btn-accion" onclick="alert('Próximo paso 👀')">
+                        <span class="emoji">📊</span>
+                        Reportes
+                    </button>
+                    <button class="btn-accion" onclick="alert('Próximo paso 👀')">
+                        <span class="emoji">📁</span>
+                        Documentos
+                    </button>
+                    <button class="btn-accion" onclick="alert('Próximo paso 👀')">
+                        <span class="emoji">⏰</span>
+                        Recordatorios
+                    </button>
+                </div>
             </div>
         </main>
     </div>
@@ -35,44 +59,23 @@
     <script src="js/config.js"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/dashboard.js"></script>
 
     <script>
         (async () => {
-            // Proteger página: si no hay sesión, manda al login
             const ok = await protegerPagina();
             if (!ok) return;
 
-            // Probar conexión a Supabase consultando los miembros
-            const estadoEl = document.getElementById('estado-supabase');
-            try {
-                const { data, error } = await sb
-                    .from('miembros')
-                    .select('nombre, apodo, color_hex, emoji')
-                    .order('fecha_nacimiento', { ascending: true });
+            // Saludo según hora del día
+            const hora = new Date().getHours();
+            const saludoEl = document.getElementById('saludo');
+            if (hora < 12) saludoEl.textContent = 'Buenos días 👋';
+            else if (hora < 19) saludoEl.textContent = 'Buenas tardes 👋';
+            else saludoEl.textContent = 'Buenas noches 👋';
 
-                if (error) throw error;
-
-                let html = '<p style="color: var(--color-exito); font-weight: 600; margin-bottom: 12px;">✅ Conectado a Supabase</p>';
-                html += '<p style="font-size: 13px; color: var(--texto-secundario); margin-bottom: 10px;"><strong>Familia Marrana detectada:</strong></p>';
-                html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
-                data.forEach(m => {
-                    html += `
-                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: ${m.color_hex}15;">
-                            <div style="width: 32px; height: 32px; border-radius: 50%; background: ${m.color_hex}; display: flex; align-items: center; justify-content: center; font-size: 18px;">${m.emoji}</div>
-                            <strong>${m.apodo}</strong>
-                            <span style="margin-left: auto; font-size: 12px; color: var(--texto-secundario);">${m.nombre}</span>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                estadoEl.innerHTML = html;
-            } catch (err) {
-                estadoEl.innerHTML = `
-                    <p style="color: var(--color-error); font-weight: 600;">❌ Error de conexión</p>
-                    <p style="font-size: 12px; color: var(--texto-secundario); margin-top: 8px;">${err.message}</p>
-                `;
-                console.error(err);
-            }
+            // Cargar dashboard
+            await renderizarDashboard();
         })();
     </script>
 </body>
