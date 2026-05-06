@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Nuevo evento - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="history.back()">←</button>
+                <h1>Nuevo evento</h1>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <!-- Paso 1: ¿Para quién? -->
+            <div class="seccion">
+                <div class="seccion-titulo">1. ¿Para quién?</div>
+                <div id="miembros-selector" class="miembros-selector"></div>
+            </div>
+
+            <!-- Paso 2: ¿Qué tipo? (oculto hasta seleccionar miembro) -->
+            <div class="seccion" id="paso-2" style="display: none;">
+                <div class="seccion-titulo">2. ¿Qué tipo de evento?</div>
+                <div id="tipos-grid" class="tipos-grid"></div>
+            </div>
+
+            <!-- Paso 3: Detalles -->
+            <div class="seccion" id="paso-3" style="display: none;">
+                <div class="seccion-titulo">3. Detalles</div>
+                <div class="form-card">
+                    <div id="campos-extra"></div>
+                    <button id="btn-guardar" class="btn-primary" onclick="guardarEvento()" style="margin-top: 20px;">
+                        Guardar evento
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/eventos.js"></script>
+
+    <script>
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            const params = new URLSearchParams(window.location.search);
+            const miembroPreseleccionado = params.get('miembro');
+
+            const miembros = await cargarMiembrosParaSelector();
+            formState.miembros = miembros;
+
+            renderizarSelectorMiembros(miembros, miembroPreseleccionado);
+            renderizarSelectorTipos();
+
+            // Si viene preseleccionado, avanzar
+            if (miembroPreseleccionado) {
+                seleccionarMiembro(miembroPreseleccionado);
+            }
+        })();
+    </script>
+</body>
+</html>
