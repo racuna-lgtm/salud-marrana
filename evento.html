@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Detalle del evento - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="history.back()">←</button>
+                <h1>Evento</h1>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div id="loading-evento" class="loading-pantalla">
+                <div class="spinner-grande"></div>
+                <p>Cargando evento...</p>
+            </div>
+
+            <div id="evento-contenido" style="display: none;">
+                <div id="evento-hero" class="info-card"></div>
+                <div id="evento-detalles" class="info-card"></div>
+                <div id="evento-acciones" style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-secundario" onclick="eliminarEventoHandler()" style="flex: 1;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/eventos.js"></script>
+
+    <script>
+        let datosEvento = null;
+
+        async function cargarEvento(id) {
+            const { data: evento, error } = await sb
+                .from('eventos')
+                .select('*, miembros(nombre, apodo, color_hex, emoji)')
+                .eq('id', id)
+                .single();
+            if (error) throw error;
+
+            // Cargar detalles según tipo
+            const detalles = {};
+            if (['consulta_medica', 'control_preventivo', 'tratamiento_continuo', 'hospitalizacion', 'procedimiento', 'salud_mental'].includes(evento.tipo)) {
+                const { data } = await sb.from('consultas_medicas').select('*').eq('evento_id', id).maybeSingle();
+                detalles.consulta = data;
+            }
+            if (evento.tipo === 'examen') {
+                const { data } = await sb.from('examenes').select('*').eq('evento_id', id).maybeSingle();
+                detalles.examen = data;
+            }
+            if (evento.tipo === 'medicamento') {
+                const { data } = await sb.from('medicamentos').select('*').eq('evento_id', id).maybeSingle();
+                detalles.medicamento = data;
+            }
+            if (evento.tipo === 'vacuna') {
+                const { data } = await sb.from('vacunas').select('*').eq('evento_id', id).maybeSingle();
+                detalles.vacuna = data;
+            }
+            if (evento.tipo === 'medicion') {
+                const { data } = await sb.from('mediciones').select('*').eq('evento_id', id).maybeSingle();
+                detalles.medicion = data;
+            }
+
+            return { evento, detalles };
+        }
+
+        function renderizar(datos) {
+            const { evento, detalles } = datos;
+            const m = evento.miembros;
+
+            // Hero
+            const heroEl = document.getElementById('evento-hero');
+            heroEl.style.background = `linear-gradient(135deg, ${m.color_hex} 0%, ${m.color_hex}DD 100%)`;
+            heroEl.style.color = 'white';
+            heroEl.innerHTML = `
+                <div style="font-size: 32px; margin-bottom: 8px;">${CAMPOS_POR_TIPO[evento.tipo]?.emoji || '📌'}</div>
+                <h2 style="font-size: 22px; margin-bottom: 4px;">${evento.titulo}</h2>
+                <div style="opacity: 0.9; font-size: 14px;">${etiquetaTipoEvento(evento.tipo)} · ${m.emoji} ${m.apodo}</div>
+                <div style="margin-top: 12px; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px; display: inline-block; font-size: 13px;">
+                    📅 ${formatearFecha(evento.fecha)}${evento.hora ? ' · ' + evento.hora.substring(0,5) : ''}
+                </div>
+            `;
+
+            // Detalles
+            let detallesHtml = '<h4>Detalles</h4>';
+            if (evento.descripcion) {
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Descripción</span><span class="valor">${evento.descripcion.replace(/\n/g, '<br>')}</span></div>`;
+            }
+            if (evento.severidad) {
+                const sevMap = { leve: '🟢 Leve', moderado: '🟡 Moderado', severo: '🔴 Severo' };
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Severidad</span><span class="valor">${sevMap[evento.severidad]}</span></div>`;
+            }
+
+            // Consulta
+            if (detalles.consulta) {
+                const c = detalles.consulta;
+                if (c.medico_nombre) detallesHtml += `<div class="info-row"><span class="etiqueta">Profesional</span><span class="valor">${c.medico_nombre}</span></div>`;
+                if (c.especialidad) detallesHtml += `<div class="info-row"><span class="etiqueta">Especialidad</span><span class="valor">${c.especialidad}</span></div>`;
+                if (c.centro_medico) detallesHtml += `<div class="info-row"><span class="etiqueta">Centro</span><span class="valor">${c.centro_medico}</span></div>`;
+                if (c.diagnostico) detallesHtml += `<div class="info-row"><span class="etiqueta">Diagnóstico</span><span class="valor">${c.diagnostico}</span></div>`;
+                if (c.indicaciones) detallesHtml += `<div class="info-row"><span class="etiqueta">Indicaciones</span><span class="valor">${c.indicaciones}</span></div>`;
+                if (c.proximo_control) detallesHtml += `<div class="info-row"><span class="etiqueta">Próximo control</span><span class="valor">${formatearFechaCorta(c.proximo_control)}</span></div>`;
+            }
+
+            // Examen
+            if (detalles.examen) {
+                const e = detalles.examen;
+                if (e.tipo_examen) detallesHtml += `<div class="info-row"><span class="etiqueta">Tipo</span><span class="valor">${e.tipo_examen}</span></div>`;
+                if (e.laboratorio) detallesHtml += `<div class="info-row"><span class="etiqueta">Laboratorio</span><span class="valor">${e.laboratorio}</span></div>`;
+                if (e.fecha_resultado) detallesHtml += `<div class="info-row"><span class="etiqueta">Fecha resultado</span><span class="valor">${formatearFechaCorta(e.fecha_resultado)}</span></div>`;
+                if (e.interpretacion) detallesHtml += `<div class="info-row"><span class="etiqueta">Interpretación</span><span class="valor">${e.interpretacion}</span></div>`;
+            }
+
+            // Medicamento
+            if (detalles.medicamento) {
+                const m = detalles.medicamento;
+                const tipoMap = { puntual: '💊 Puntual', regular: '🔄 Regular', asociado_enfermedad: '🤒 Por enfermedad' };
+                if (m.dosis) detallesHtml += `<div class="info-row"><span class="etiqueta">Dosis</span><span class="valor">${m.dosis}</span></div>`;
+                if (m.frecuencia) detallesHtml += `<div class="info-row"><span class="etiqueta">Frecuencia</span><span class="valor">${m.frecuencia}</span></div>`;
+                if (m.via) detallesHtml += `<div class="info-row"><span class="etiqueta">Vía</span><span class="valor">${m.via}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Tipo</span><span class="valor">${tipoMap[m.tipo] || m.tipo}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Inicio</span><span class="valor">${formatearFechaCorta(m.fecha_inicio)}</span></div>`;
+                if (m.fecha_fin) detallesHtml += `<div class="info-row"><span class="etiqueta">Fin</span><span class="valor">${formatearFechaCorta(m.fecha_fin)}</span></div>`;
+                if (m.motivo) detallesHtml += `<div class="info-row"><span class="etiqueta">Motivo</span><span class="valor">${m.motivo}</span></div>`;
+                if (m.recetado_por) detallesHtml += `<div class="info-row"><span class="etiqueta">Recetado por</span><span class="valor">${m.recetado_por}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Estado</span><span class="valor">${m.en_curso ? '🔄 En curso' : '✅ Finalizado'}</span></div>`;
+
+                if (m.en_curso) {
+                    detallesHtml += `<button class="btn-primary" style="margin-top: 16px;" onclick="finalizarMedicamento('${m.id}', '${evento.miembro_id}')">✓ Marcar como finalizado</button>`;
+                }
+            }
+
+            // Vacuna
+            if (detalles.vacuna) {
+                const v = detalles.vacuna;
+                const lugarMap = { colegio: '🏫 Colegio', farmacia: '💊 Farmacia', consultorio: '🏥 Consultorio', clinica: '🏥 Clínica', otro: 'Otro' };
+                if (v.lugar) detallesHtml += `<div class="info-row"><span class="etiqueta">Lugar</span><span class="valor">${lugarMap[v.lugar]}</span></div>`;
+            }
+
+            // Medición
+            if (detalles.medicion) {
+                const med = detalles.medicion;
+                if (med.peso_kg) detallesHtml += `<div class="info-row"><span class="etiqueta">Peso</span><span class="valor">${med.peso_kg} kg</span></div>`;
+                if (med.talla_cm) detallesHtml += `<div class="info-row"><span class="etiqueta">Talla</span><span class="valor">${med.talla_cm} cm</span></div>`;
+                if (med.imc) detallesHtml += `<div class="info-row"><span class="etiqueta">IMC</span><span class="valor">${med.imc}</span></div>`;
+                if (med.presion_sistolica) detallesHtml += `<div class="info-row"><span class="etiqueta">Presión</span><span class="valor">${med.presion_sistolica}/${med.presion_diastolica}</span></div>`;
+                if (med.temperatura) detallesHtml += `<div class="info-row"><span class="etiqueta">Temperatura</span><span class="valor">${med.temperatura}°C</span></div>`;
+            }
+
+            // Tags
+            if (evento.tags && evento.tags.length > 0) {
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Etiquetas</span><span class="valor">${evento.tags.map(t => `<span class="condicion-tag" style="background:#9B5DE525; color:#9B5DE5;">#${t}</span>`).join(' ')}</span></div>`;
+            }
+
+            document.getElementById('evento-detalles').innerHTML = detallesHtml;
+            document.getElementById('loading-evento').style.display = 'none';
+            document.getElementById('evento-contenido').style.display = 'block';
+        }
+
+        window.eliminarEventoHandler = function() {
+            if (datosEvento) {
+                eliminarEvento(datosEvento.evento.id, datosEvento.evento.miembro_id);
+            }
+        };
+
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            if (!id) {
+                mostrarToast('Falta el id del evento', 'error');
+                setTimeout(() => history.back(), 1500);
+                return;
+            }
+
+            try {
+                datosEvento = await cargarEvento(id);
+                renderizar(datosEvento);
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error al cargar el evento', 'error');
+            }
+        })();
+    </script>
+</body>
+</html>
