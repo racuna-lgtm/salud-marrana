@@ -39,6 +39,11 @@
         </main>
     </div>
 
+    <!-- FAB de voz -->
+    <button class="fab-voz" onclick="abrirModalVoz()" title="Registrar por voz">
+        🎤
+    </button>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
     <script src="js/supabase-client.js"></script>
@@ -46,6 +51,7 @@
     <script src="js/utils.js"></script>
     <script src="js/documentos.js"></script>
     <script src="js/eventos.js"></script>
+    <script src="js/voz.js"></script>
 
     <script>
         (async () => {
@@ -64,6 +70,9 @@
             if (miembroPreseleccionado) {
                 seleccionarMiembro(miembroPreseleccionado);
             }
+
+            // Si venimos desde el flujo de voz, aplicar el dictado
+            aplicarDictadoSiCorresponde();
         })();
     </script>
 </body>
