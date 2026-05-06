@@ -8,7 +8,7 @@ const DOC_CONFIG = {
     compresionImagen: {
         maxAncho: 1600,
         maxAlto: 1600,
-        calidad: 0.75 // 0-1
+        calidad: 0.75
     },
     formatosImagen: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
     formatosPDF: ['application/pdf']
@@ -22,12 +22,8 @@ const TIPOS_DOCUMENTO = {
     otro: { emoji: '📎', label: 'Otro' }
 };
 
-// Estado: archivos pendientes de subir antes de guardar el evento
 const docsPendientes = [];
 
-// =====================================================
-// COMPRESIÓN DE IMÁGENES
-// =====================================================
 async function comprimirImagen(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -37,7 +33,6 @@ async function comprimirImagen(file) {
                 const { maxAncho, maxAlto, calidad } = DOC_CONFIG.compresionImagen;
                 let { width, height } = img;
 
-                // Redimensionar manteniendo proporción
                 if (width > maxAncho || height > maxAlto) {
                     const ratio = Math.min(maxAncho / width, maxAlto / height);
                     width = Math.round(width * ratio);
@@ -67,9 +62,6 @@ async function comprimirImagen(file) {
     });
 }
 
-// =====================================================
-// VALIDAR ARCHIVO
-// =====================================================
 function validarArchivo(file) {
     const sizeMB = file.size / (1024 * 1024);
     const esImagen = DOC_CONFIG.formatosImagen.includes(file.type);
@@ -86,9 +78,6 @@ function validarArchivo(file) {
     return { ok: true, esImagen, esPDF };
 }
 
-// =====================================================
-// AGREGAR DOC A LA LISTA DE PENDIENTES (al crear evento)
-// =====================================================
 async function agregarDocPendiente(file) {
     const validacion = validarArchivo(file);
     if (!validacion.ok) {
@@ -99,7 +88,6 @@ async function agregarDocPendiente(file) {
     let archivoFinal = file;
     let preview = null;
 
-    // Si es imagen, comprimimos y generamos preview
     if (validacion.esImagen) {
         try {
             archivoFinal = await comprimirImagen(file);
@@ -119,26 +107,22 @@ async function agregarDocPendiente(file) {
         esImagen: validacion.esImagen,
         esPDF: validacion.esPDF,
         preview,
-        tipo: 'otro' // Por defecto, el usuario puede cambiarlo
+        tipo: 'otro'
     };
 
     docsPendientes.push(doc);
     return doc;
 }
 
-// =====================================================
-// SUBIR ARCHIVO A SUPABASE STORAGE
-// =====================================================
 async function subirDocumento(doc, miembroId, eventoId) {
     const ext = doc.esImagen ? 'jpg' : 'pdf';
     const timestamp = Date.now();
     const nombreLimpio = doc.nombreOriginal
         .replace(/[^a-zA-Z0-9.-]/g, '_')
-        .replace(/\.[^.]+$/, ''); // sin extensión
+        .replace(/\.[^.]+$/, '');
     const nombreFinal = `${timestamp}-${nombreLimpio}.${ext}`;
     const ruta = `${miembroId}/${eventoId}/${nombreFinal}`;
 
-    // Subir a Storage
     const { data: uploadData, error: uploadErr } = await sb.storage
         .from(DOC_CONFIG.bucket)
         .upload(ruta, doc.file, {
@@ -149,7 +133,6 @@ async function subirDocumento(doc, miembroId, eventoId) {
 
     if (uploadErr) throw uploadErr;
 
-    // Registrar en tabla documentos
     const { data: docRow, error: insertErr } = await sb
         .from('documentos')
         .insert({
@@ -168,9 +151,6 @@ async function subirDocumento(doc, miembroId, eventoId) {
     return docRow;
 }
 
-// =====================================================
-// SUBIR TODOS LOS DOCS PENDIENTES (al guardar evento)
-// =====================================================
 async function subirDocsPendientes(miembroId, eventoId) {
     if (docsPendientes.length === 0) return { exitos: 0, errores: 0 };
 
@@ -187,7 +167,6 @@ async function subirDocsPendientes(miembroId, eventoId) {
         }
     }
 
-    // Limpiar pendientes
     docsPendientes.forEach(d => {
         if (d.preview) URL.revokeObjectURL(d.preview);
     });
@@ -196,9 +175,6 @@ async function subirDocsPendientes(miembroId, eventoId) {
     return { exitos, errores };
 }
 
-// =====================================================
-// OBTENER URL FIRMADA PARA VER UN DOC
-// =====================================================
 async function obtenerUrlFirmada(rutaStorage, expiraSegundos = 3600) {
     const { data, error } = await sb.storage
         .from(DOC_CONFIG.bucket)
@@ -211,9 +187,6 @@ async function obtenerUrlFirmada(rutaStorage, expiraSegundos = 3600) {
     return data.signedUrl;
 }
 
-// =====================================================
-// LISTAR DOCS DE UN EVENTO
-// =====================================================
 async function obtenerDocsDeEvento(eventoId) {
     const { data, error } = await sb
         .from('documentos')
@@ -228,16 +201,11 @@ async function obtenerDocsDeEvento(eventoId) {
     return data || [];
 }
 
-// =====================================================
-// ELIMINAR DOCUMENTO
-// =====================================================
 async function eliminarDocumento(docId, rutaStorage) {
     if (!confirm('¿Eliminar este documento?')) return false;
 
     try {
-        // Borrar de Storage
         await sb.storage.from(DOC_CONFIG.bucket).remove([rutaStorage]);
-        // Borrar registro
         const { error } = await sb.from('documentos').delete().eq('id', docId);
         if (error) throw error;
 
@@ -250,9 +218,6 @@ async function eliminarDocumento(docId, rutaStorage) {
     }
 }
 
-// =====================================================
-// RENDERIZAR LISTA DE DOCS PENDIENTES (al crear evento)
-// =====================================================
 function renderizarDocsPendientes() {
     const cont = document.getElementById('docs-pendientes-lista');
     if (!cont) return;
@@ -264,7 +229,6 @@ function renderizarDocsPendientes() {
 
     let html = '';
     docsPendientes.forEach(doc => {
-        const tipoInfo = TIPOS_DOCUMENTO[doc.tipo];
         html += `
             <div class="doc-pendiente">
                 <div class="doc-pendiente-preview">
@@ -314,12 +278,9 @@ window.manejarSeleccionArchivos = async function(input) {
     }
 
     renderizarDocsPendientes();
-    input.value = ''; // Limpiar input para permitir subir el mismo archivo de nuevo
+    input.value = '';
 };
 
-// =====================================================
-// HTML DEL UPLOADER (para insertar en formularios)
-// =====================================================
 function htmlUploaderDocs() {
     return `
         <div class="docs-uploader">
@@ -350,9 +311,6 @@ function htmlUploaderDocs() {
     `;
 }
 
-// =====================================================
-// RENDERIZAR DOCS YA GUARDADOS (en detalle de evento)
-// =====================================================
 async function renderizarDocsGuardados(contenedorId, eventoId) {
     const cont = document.getElementById(contenedorId);
     if (!cont) return;
@@ -388,7 +346,6 @@ async function renderizarDocsGuardados(contenedorId, eventoId) {
     html += '</div>';
     cont.innerHTML = html;
 
-    // Cargar thumbnails de imágenes (URLs firmadas)
     const thumbs = cont.querySelectorAll('.doc-thumb');
     for (const thumb of thumbs) {
         const ruta = thumb.dataset.ruta;
@@ -407,14 +364,12 @@ window.abrirDoc = async function(docId, rutaStorage, mimeType) {
         mostrarToast('No se pudo abrir el documento', 'error');
         return;
     }
-    // Abrir en nueva pestaña
     window.open(url, '_blank');
 };
 
 window.eliminarDocHandler = async function(docId, rutaStorage) {
     const ok = await eliminarDocumento(docId, rutaStorage);
     if (ok) {
-        // Recargar la sección de docs
         const params = new URLSearchParams(window.location.search);
         const eventoId = params.get('id');
         if (eventoId) {
