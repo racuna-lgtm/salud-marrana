@@ -27,6 +27,10 @@
             <div id="perfil-contenido" style="display: none;">
                 <div id="perfil-hero" class="perfil-hero"></div>
 
+                <button id="btn-nuevo-evento-perfil" class="btn-primary" style="margin-bottom: 20px;" onclick="irANuevoEvento()">
+                    ➕ Registrar evento
+                </button>
+
                 <div id="datos-basicos" class="info-card"></div>
                 <div id="condiciones" class="info-card" style="display: none;"></div>
                 <div id="medicamentos-curso" class="info-card" style="display: none;"></div>
@@ -63,6 +67,11 @@
                 const datos = await cargarPerfilCompleto(miembroId);
                 document.getElementById('header-titulo').textContent = datos.miembro.apodo;
                 renderizarPerfil(datos);
+
+                // Función global para ir a nuevo evento con miembro preseleccionado
+                window.irANuevoEvento = function() {
+                    window.location.href = `nuevo-evento.html?miembro=${miembroId}`;
+                };
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al cargar el perfil', 'error');
