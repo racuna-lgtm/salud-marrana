@@ -26,7 +26,6 @@
                 <div id="evento-hero" class="info-card"></div>
                 <div id="evento-detalles" class="info-card"></div>
 
-                <!-- Sección de documentos -->
                 <div class="info-card">
                     <h4>📎 Documentos</h4>
                     <div id="docs-evento-lista" style="margin-bottom: 16px;"></div>
@@ -82,7 +81,6 @@
                 .single();
             if (error) throw error;
 
-            // Cargar detalles según tipo
             const detalles = {};
             if (['consulta_medica', 'control_preventivo', 'tratamiento_continuo', 'hospitalizacion', 'procedimiento', 'salud_mental'].includes(evento.tipo)) {
                 const { data } = await sb.from('consultas_medicas').select('*').eq('evento_id', id).maybeSingle();
@@ -112,7 +110,6 @@
             const { evento, detalles } = datos;
             const m = evento.miembros;
 
-            // Hero
             const heroEl = document.getElementById('evento-hero');
             heroEl.style.background = `linear-gradient(135deg, ${m.color_hex} 0%, ${m.color_hex}DD 100%)`;
             heroEl.style.color = 'white';
@@ -125,7 +122,6 @@
                 </div>
             `;
 
-            // Detalles
             let detallesHtml = '<h4>Detalles</h4>';
             if (evento.descripcion) {
                 detallesHtml += `<div class="info-row"><span class="etiqueta">Descripción</span><span class="valor">${evento.descripcion.replace(/\n/g, '<br>')}</span></div>`;
@@ -135,7 +131,6 @@
                 detallesHtml += `<div class="info-row"><span class="etiqueta">Severidad</span><span class="valor">${sevMap[evento.severidad]}</span></div>`;
             }
 
-            // Consulta
             if (detalles.consulta) {
                 const c = detalles.consulta;
                 if (c.medico_nombre) detallesHtml += `<div class="info-row"><span class="etiqueta">Profesional</span><span class="valor">${c.medico_nombre}</span></div>`;
@@ -146,7 +141,6 @@
                 if (c.proximo_control) detallesHtml += `<div class="info-row"><span class="etiqueta">Próximo control</span><span class="valor">${formatearFechaCorta(c.proximo_control)}</span></div>`;
             }
 
-            // Examen
             if (detalles.examen) {
                 const e = detalles.examen;
                 if (e.tipo_examen) detallesHtml += `<div class="info-row"><span class="etiqueta">Tipo</span><span class="valor">${e.tipo_examen}</span></div>`;
@@ -155,33 +149,30 @@
                 if (e.interpretacion) detallesHtml += `<div class="info-row"><span class="etiqueta">Interpretación</span><span class="valor">${e.interpretacion}</span></div>`;
             }
 
-            // Medicamento
             if (detalles.medicamento) {
-                const m = detalles.medicamento;
+                const med = detalles.medicamento;
                 const tipoMap = { puntual: '💊 Puntual', regular: '🔄 Regular', asociado_enfermedad: '🤒 Por enfermedad' };
-                if (m.dosis) detallesHtml += `<div class="info-row"><span class="etiqueta">Dosis</span><span class="valor">${m.dosis}</span></div>`;
-                if (m.frecuencia) detallesHtml += `<div class="info-row"><span class="etiqueta">Frecuencia</span><span class="valor">${m.frecuencia}</span></div>`;
-                if (m.via) detallesHtml += `<div class="info-row"><span class="etiqueta">Vía</span><span class="valor">${m.via}</span></div>`;
-                detallesHtml += `<div class="info-row"><span class="etiqueta">Tipo</span><span class="valor">${tipoMap[m.tipo] || m.tipo}</span></div>`;
-                detallesHtml += `<div class="info-row"><span class="etiqueta">Inicio</span><span class="valor">${formatearFechaCorta(m.fecha_inicio)}</span></div>`;
-                if (m.fecha_fin) detallesHtml += `<div class="info-row"><span class="etiqueta">Fin</span><span class="valor">${formatearFechaCorta(m.fecha_fin)}</span></div>`;
-                if (m.motivo) detallesHtml += `<div class="info-row"><span class="etiqueta">Motivo</span><span class="valor">${m.motivo}</span></div>`;
-                if (m.recetado_por) detallesHtml += `<div class="info-row"><span class="etiqueta">Recetado por</span><span class="valor">${m.recetado_por}</span></div>`;
-                detallesHtml += `<div class="info-row"><span class="etiqueta">Estado</span><span class="valor">${m.en_curso ? '🔄 En curso' : '✅ Finalizado'}</span></div>`;
+                if (med.dosis) detallesHtml += `<div class="info-row"><span class="etiqueta">Dosis</span><span class="valor">${med.dosis}</span></div>`;
+                if (med.frecuencia) detallesHtml += `<div class="info-row"><span class="etiqueta">Frecuencia</span><span class="valor">${med.frecuencia}</span></div>`;
+                if (med.via) detallesHtml += `<div class="info-row"><span class="etiqueta">Vía</span><span class="valor">${med.via}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Tipo</span><span class="valor">${tipoMap[med.tipo] || med.tipo}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Inicio</span><span class="valor">${formatearFechaCorta(med.fecha_inicio)}</span></div>`;
+                if (med.fecha_fin) detallesHtml += `<div class="info-row"><span class="etiqueta">Fin</span><span class="valor">${formatearFechaCorta(med.fecha_fin)}</span></div>`;
+                if (med.motivo) detallesHtml += `<div class="info-row"><span class="etiqueta">Motivo</span><span class="valor">${med.motivo}</span></div>`;
+                if (med.recetado_por) detallesHtml += `<div class="info-row"><span class="etiqueta">Recetado por</span><span class="valor">${med.recetado_por}</span></div>`;
+                detallesHtml += `<div class="info-row"><span class="etiqueta">Estado</span><span class="valor">${med.en_curso ? '🔄 En curso' : '✅ Finalizado'}</span></div>`;
 
-                if (m.en_curso) {
-                    detallesHtml += `<button class="btn-primary" style="margin-top: 16px;" onclick="finalizarMedicamento('${m.id}', '${evento.miembro_id}')">✓ Marcar como finalizado</button>`;
+                if (med.en_curso) {
+                    detallesHtml += `<button class="btn-primary" style="margin-top: 16px;" onclick="finalizarMedicamento('${med.id}', '${evento.miembro_id}')">✓ Marcar como finalizado</button>`;
                 }
             }
 
-            // Vacuna
             if (detalles.vacuna) {
                 const v = detalles.vacuna;
                 const lugarMap = { colegio: '🏫 Colegio', farmacia: '💊 Farmacia', consultorio: '🏥 Consultorio', clinica: '🏥 Clínica', otro: 'Otro' };
                 if (v.lugar) detallesHtml += `<div class="info-row"><span class="etiqueta">Lugar</span><span class="valor">${lugarMap[v.lugar]}</span></div>`;
             }
 
-            // Medición
             if (detalles.medicion) {
                 const med = detalles.medicion;
                 if (med.peso_kg) detallesHtml += `<div class="info-row"><span class="etiqueta">Peso</span><span class="valor">${med.peso_kg} kg</span></div>`;
@@ -191,7 +182,6 @@
                 if (med.temperatura) detallesHtml += `<div class="info-row"><span class="etiqueta">Temperatura</span><span class="valor">${med.temperatura}°C</span></div>`;
             }
 
-            // Tags
             if (evento.tags && evento.tags.length > 0) {
                 detallesHtml += `<div class="info-row"><span class="etiqueta">Etiquetas</span><span class="valor">${evento.tags.map(t => `<span class="condicion-tag" style="background:#9B5DE525; color:#9B5DE5;">#${t}</span>`).join(' ')}</span></div>`;
             }
@@ -207,7 +197,6 @@
             }
         };
 
-        // Subir docs directamente al evento ya creado
         window.manejarUploadDirecto = async function(input) {
             const archivos = Array.from(input.files);
             if (archivos.length === 0) return;
@@ -229,7 +218,6 @@
                 }
             }
 
-            // Limpiar pendientes y refrescar lista
             docsPendientes.length = 0;
             input.value = '';
             await renderizarDocsGuardados('docs-evento-lista', eventoId);
@@ -251,7 +239,6 @@
             try {
                 datosEvento = await cargarEvento(id);
                 renderizar(datosEvento);
-                // Cargar documentos del evento
                 await renderizarDocsGuardados('docs-evento-lista', id);
             } catch (err) {
                 console.error(err);
