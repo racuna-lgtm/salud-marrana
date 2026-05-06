@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Perfil - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="window.location.href='index.html'">←</button>
+                <h1 id="header-titulo">Perfil</h1>
+            </div>
+            <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+        </header>
+
+        <main class="app-content">
+            <div id="loading-perfil" class="loading-pantalla">
+                <div class="spinner-grande"></div>
+                <p>Cargando perfil...</p>
+            </div>
+
+            <div id="perfil-contenido" style="display: none;">
+                <div id="perfil-hero" class="perfil-hero"></div>
+
+                <div id="datos-basicos" class="info-card"></div>
+                <div id="condiciones" class="info-card" style="display: none;"></div>
+                <div id="medicamentos-curso" class="info-card" style="display: none;"></div>
+                <div id="recordatorios" class="info-card" style="display: none;"></div>
+                <div id="eventos-recientes" class="info-card"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/perfil.js"></script>
+
+    <script>
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            // Obtener id del miembro desde la URL
+            const params = new URLSearchParams(window.location.search);
+            const miembroId = params.get('id');
+
+            if (!miembroId) {
+                mostrarToast('Falta el id del miembro', 'error');
+                setTimeout(() => window.location.href = 'index.html', 1500);
+                return;
+            }
+
+            try {
+                const datos = await cargarPerfilCompleto(miembroId);
+                document.getElementById('header-titulo').textContent = datos.miembro.apodo;
+                renderizarPerfil(datos);
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error al cargar el perfil', 'error');
+                document.getElementById('loading-perfil').innerHTML = `
+                    <p style="color: var(--color-error);">No pudimos cargar el perfil</p>
+                    <button class="btn-primary" style="max-width: 200px;" onclick="window.location.href='index.html'">Volver</button>
+                `;
+            }
+        })();
+    </script>
+</body>
+</html>
