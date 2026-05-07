@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Recordatorios - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="window.location.href='index.html'">←</button>
+                <h1>⏰ Recordatorios</h1>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div class="seccion">
+                <div class="seccion-titulo">Filtrar por miembro</div>
+                <div id="filtros-miembros" class="filtros-miembros"></div>
+            </div>
+
+            <div class="seccion">
+                <div id="recordatorios-lista" class="recordatorios-lista">
+                    <div class="loading-pantalla" style="min-height: 200px;">
+                        <div class="spinner-grande"></div>
+                        <p>Cargando recordatorios...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <button class="fab-recordatorio" onclick="abrirFormRecordatorio()" title="Nuevo recordatorio">
+            ➕
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/recordatorios.js"></script>
+
+    <script>
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+            await inicializarRecordatorios();
+        })();
+    </script>
+</body>
+</html>
