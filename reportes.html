@@ -36,13 +36,11 @@
             </div>
 
             <div id="contenido-reportes" style="display: none;">
-                <!-- Estadísticas resumen -->
                 <div class="seccion">
                     <div class="seccion-titulo">Resumen últimos 12 meses</div>
                     <div class="stats-grid" id="stats-grid"></div>
                 </div>
 
-                <!-- Comparativa familiar -->
                 <div class="seccion">
                     <div class="seccion-titulo">Eventos por miembro</div>
                     <div class="grafico-card">
@@ -52,7 +50,6 @@
                     </div>
                 </div>
 
-                <!-- Eventos por tipo -->
                 <div class="seccion">
                     <div class="seccion-titulo">Distribución por tipo de evento</div>
                     <div class="grafico-card">
@@ -62,7 +59,6 @@
                     </div>
                 </div>
 
-                <!-- Síntomas por mes -->
                 <div class="seccion">
                     <div class="seccion-titulo">Frecuencia de síntomas por mes</div>
                     <div class="grafico-card">
@@ -72,7 +68,6 @@
                     </div>
                 </div>
 
-                <!-- Consultas por especialidad -->
                 <div class="seccion">
                     <div class="seccion-titulo">Consultas por especialidad</div>
                     <div class="grafico-card">
@@ -82,7 +77,6 @@
                     </div>
                 </div>
 
-                <!-- Medicamentos más usados -->
                 <div class="seccion">
                     <div class="seccion-titulo">Medicamentos más usados</div>
                     <div class="grafico-card">
@@ -114,7 +108,6 @@
             const datos = await cargarDatosReporte(null, 12);
             const stats = calcularEstadisticas(datos);
 
-            // Renderizar stats
             const statsEl = document.getElementById('stats-grid');
             statsEl.innerHTML = `
                 <div class="stat-card">
@@ -142,12 +135,12 @@
             document.getElementById('loading-reportes').style.display = 'none';
             document.getElementById('contenido-reportes').style.display = 'block';
 
-            // Renderizar gráficos
+            // Gráficos vista familia (sin miembroId, usa colores por persona)
             graficoComparativaFamilia('grafico-familia', datos);
             graficoEventosPorTipo('grafico-tipos', datos);
-            graficoSintomasPorMes('grafico-sintomas', datos);
+            await graficoSintomasPorMes('grafico-sintomas', datos);
             graficoConsultasPorEspecialidad('grafico-especialidades', datos);
-            graficoMedicamentosMasUsados('grafico-medicamentos', datos);
+            await graficoMedicamentosMasUsados('grafico-medicamentos', datos);
         })();
     </script>
 </body>
