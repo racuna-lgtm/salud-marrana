@@ -1,8 +1,20 @@
 // =====================================================
-// SALUD MARRANA - Reportes, gráficos y exportar PDF
+// SALUD MARRANA - Reportes, gráficos y exportar PDF (FIX)
 // =====================================================
 
 const COLORES_GRAFICO = ['#9B5DE5', '#7FD858', '#06A77D', '#00BBF9', '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
+
+// Cache de miembros para reutilizar
+let _miembrosCache = null;
+async function obtenerMiembrosCache() {
+    if (_miembrosCache) return _miembrosCache;
+    const { data } = await sb
+        .from('miembros')
+        .select('id, apodo, color_hex, emoji')
+        .order('fecha_nacimiento', { ascending: true });
+    _miembrosCache = data || [];
+    return _miembrosCache;
+}
 
 // Cargar datos generales
 async function cargarDatosReporte(miembroId = null, mesesAtras = 12) {
@@ -20,7 +32,6 @@ async function cargarDatosReporte(miembroId = null, mesesAtras = 12) {
 
     const { data: eventos } = await query;
 
-    // Cargar consultas asociadas para análisis de especialidad
     const eventosIds = (eventos || []).map(e => e.id);
     let consultas = [];
     if (eventosIds.length > 0) {
@@ -31,12 +42,10 @@ async function cargarDatosReporte(miembroId = null, mesesAtras = 12) {
         consultas = data || [];
     }
 
-    // Mediciones
     let queryMed = sb.from('mediciones').select('*, miembros(apodo, color_hex)').gte('fecha', fechaInicioStr).order('fecha', { ascending: true });
     if (miembroId) queryMed = queryMed.eq('miembro_id', miembroId);
     const { data: mediciones } = await queryMed;
 
-    // Medicamentos
     let queryMeds = sb.from('medicamentos').select('*, miembros(apodo, color_hex)').gte('fecha_inicio', fechaInicioStr);
     if (miembroId) queryMeds = queryMeds.eq('miembro_id', miembroId);
     const { data: medicamentos } = await queryMeds;
@@ -60,7 +69,6 @@ function calcularEstadisticas(datos) {
     const medicamentosTotal = datos.medicamentos.length;
     const enCurso = datos.medicamentos.filter(m => m.en_curso).length;
 
-    // Promedio mensual
     const meses = new Set();
     eventos.forEach(e => {
         const m = e.fecha.substring(0, 7);
@@ -69,19 +77,15 @@ function calcularEstadisticas(datos) {
     const promedioMensual = meses.size > 0 ? (totalEventos / meses.size).toFixed(1) : 0;
 
     return {
-        totalEventos,
-        sintomas,
-        consultas,
-        medicamentosTotal,
-        enCurso,
-        promedioMensual
+        totalEventos, sintomas, consultas,
+        medicamentosTotal, enCurso, promedioMensual
     };
 }
 
 // =====================================================
-// GRÁFICO: SÍNTOMAS POR MES
+// GRÁFICO: SÍNTOMAS POR MES (apilado por miembro si es vista familia)
 // =====================================================
-function graficoSintomasPorMes(canvasId, datos, miembroId = null) {
+async function graficoSintomasPorMes(canvasId, datos, miembroId = null) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
@@ -91,47 +95,82 @@ function graficoSintomasPorMes(canvasId, datos, miembroId = null) {
         return;
     }
 
-    // Agrupar por mes
-    const porMes = {};
-    eventos.forEach(e => {
-        const mes = e.fecha.substring(0, 7);
-        porMes[mes] = (porMes[mes] || 0) + 1;
-    });
-
-    const meses = Object.keys(porMes).sort();
-    const valores = meses.map(m => porMes[m]);
+    // Obtener todos los meses únicos
+    const mesesSet = new Set();
+    eventos.forEach(e => mesesSet.add(e.fecha.substring(0, 7)));
+    const meses = Array.from(mesesSet).sort();
     const labels = meses.map(m => {
         const [a, mm] = m.split('-');
         const nombresMes = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         return `${nombresMes[parseInt(mm) - 1]} ${a.substring(2)}`;
     });
 
+    // Si es vista individual (miembro específico), gráfico simple
+    if (miembroId) {
+        const miembros = await obtenerMiembrosCache();
+        const miembro = miembros.find(m => m.id === miembroId);
+        const color = miembro?.color_hex || '#9B5DE5';
+
+        const valores = meses.map(m => eventos.filter(e => e.fecha.startsWith(m)).length);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Síntomas',
+                    data: valores,
+                    backgroundColor: color + 'CC',
+                    borderColor: color,
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+        return;
+    }
+
+    // Vista familia: gráfico apilado por miembro
+    const miembros = await obtenerMiembrosCache();
+    const datasets = miembros.map(m => {
+        const valores = meses.map(mes =>
+            eventos.filter(e => e.fecha.startsWith(mes) && e.miembro_id === m.id).length
+        );
+        return {
+            label: m.apodo,
+            data: valores,
+            backgroundColor: m.color_hex + 'CC',
+            borderColor: m.color_hex,
+            borderWidth: 1,
+            borderRadius: 4
+        };
+    });
+
     new Chart(canvas, {
         type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Síntomas',
-                data: valores,
-                backgroundColor: 'rgba(155, 93, 229, 0.7)',
-                borderColor: '#9B5DE5',
-                borderWidth: 2,
-                borderRadius: 8
-            }]
-        },
+        data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 12, font: { size: 12 } } }
+            },
             scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
             }
         }
     });
 }
 
 // =====================================================
-// GRÁFICO: CONSULTAS POR ESPECIALIDAD
+// GRÁFICO: CONSULTAS POR ESPECIALIDAD (dona, colores variados)
 // =====================================================
 function graficoConsultasPorEspecialidad(canvasId, datos) {
     const canvas = document.getElementById(canvasId);
@@ -166,19 +205,16 @@ function graficoConsultasPorEspecialidad(canvasId, datos) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { padding: 12, font: { size: 12 } }
-                }
+                legend: { position: 'bottom', labels: { padding: 12, font: { size: 12 } } }
             }
         }
     });
 }
 
 // =====================================================
-// GRÁFICO: MEDICAMENTOS MÁS USADOS
+// GRÁFICO: MEDICAMENTOS MÁS USADOS (color del miembro principal)
 // =====================================================
-function graficoMedicamentosMasUsados(canvasId, datos) {
+async function graficoMedicamentosMasUsados(canvasId, datos, miembroId = null) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
@@ -188,19 +224,71 @@ function graficoMedicamentosMasUsados(canvasId, datos) {
         return;
     }
 
+    // Si es vista individual, color único de la persona
+    if (miembroId) {
+        const miembros = await obtenerMiembrosCache();
+        const miembro = miembros.find(m => m.id === miembroId);
+        const color = miembro?.color_hex || '#7FD858';
+
+        const porNombre = {};
+        meds.forEach(m => {
+            const nombre = m.nombre.toLowerCase();
+            porNombre[nombre] = (porNombre[nombre] || 0) + 1;
+        });
+
+        const top = Object.entries(porNombre).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const labels = top.map(t => t[0].charAt(0).toUpperCase() + t[0].slice(1));
+        const valores = top.map(t => t[1]);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Veces registrado',
+                    data: valores,
+                    backgroundColor: color + 'CC',
+                    borderColor: color,
+                    borderWidth: 1,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+        return;
+    }
+
+    // Vista familia: color del miembro principal de cada medicamento
     const porNombre = {};
     meds.forEach(m => {
         const nombre = m.nombre.toLowerCase();
-        porNombre[nombre] = (porNombre[nombre] || 0) + 1;
+        if (!porNombre[nombre]) {
+            porNombre[nombre] = { count: 0, miembros: {} };
+        }
+        porNombre[nombre].count++;
+        const miembroId = m.miembro_id;
+        if (!porNombre[nombre].miembros[miembroId]) {
+            porNombre[nombre].miembros[miembroId] = { count: 0, color: m.miembros?.color_hex || '#999' };
+        }
+        porNombre[nombre].miembros[miembroId].count++;
     });
 
-    // Top 8
-    const top = Object.entries(porNombre)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8);
+    const top = Object.entries(porNombre).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
 
     const labels = top.map(t => t[0].charAt(0).toUpperCase() + t[0].slice(1));
-    const valores = top.map(t => t[1]);
+    const valores = top.map(t => t[1].count);
+    const colores = top.map(t => {
+        // Color del miembro que más usa el medicamento
+        const miembroPrincipal = Object.entries(t[1].miembros)
+            .sort((a, b) => b[1].count - a[1].count)[0];
+        return miembroPrincipal[1].color;
+    });
 
     new Chart(canvas, {
         type: 'bar',
@@ -209,7 +297,9 @@ function graficoMedicamentosMasUsados(canvasId, datos) {
             datasets: [{
                 label: 'Veces registrado',
                 data: valores,
-                backgroundColor: COLORES_GRAFICO[1],
+                backgroundColor: colores.map(c => c + 'CC'),
+                borderColor: colores,
+                borderWidth: 1,
                 borderRadius: 8
             }]
         },
@@ -218,9 +308,7 @@ function graficoMedicamentosMasUsados(canvasId, datos) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: {
-                x: { beginAtZero: true, ticks: { stepSize: 1 } }
-            }
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
         }
     });
 }
@@ -306,7 +394,7 @@ function graficoCurvaTalla(canvasId, datos, color = '#06A77D') {
 }
 
 // =====================================================
-// GRÁFICO: EVENTOS POR TIPO (general)
+// GRÁFICO: EVENTOS POR TIPO
 // =====================================================
 function graficoEventosPorTipo(canvasId, datos) {
     const canvas = document.getElementById(canvasId);
@@ -393,7 +481,7 @@ function graficoComparativaFamilia(canvasId, datos) {
 }
 
 // =====================================================
-// EXPORTAR PDF
+// EXPORTAR PDF (sin emojis, profesional)
 // =====================================================
 async function exportarPDF(opciones) {
     const { miembroId, mesesAtras, incluirFotos } = opciones;
@@ -401,13 +489,11 @@ async function exportarPDF(opciones) {
     mostrarToast('Generando PDF, esto puede tomar unos segundos...', 'info');
 
     try {
-        // Cargar datos
         const datos = await cargarDatosReporte(miembroId, mesesAtras);
         const miembro = miembroId
             ? (await sb.from('miembros').select('*').eq('id', miembroId).single()).data
             : null;
 
-        // Cargar condiciones crónicas y medicamentos en curso
         let condiciones = [];
         let medsEnCurso = [];
         if (miembroId) {
@@ -419,7 +505,6 @@ async function exportarPDF(opciones) {
 
         const stats = calcularEstadisticas(datos);
 
-        // Crear PDF
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
         const ancho = 210;
@@ -433,7 +518,7 @@ async function exportarPDF(opciones) {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.setFont(undefined, 'bold');
-        doc.text('🐷 Salud Marrana', margen, 18);
+        doc.text('Salud Marrana', margen, 18);
         doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
         doc.text('Reporte familiar de salud', margen, 25);
@@ -452,7 +537,7 @@ async function exportarPDF(opciones) {
 
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.setTextColor(107, 114, 128);
+            doc.setTextColor(60, 60, 60);
             doc.text(`Nombre completo: ${miembro.nombre}`, margen, y); y += 5;
             doc.text(`Fecha de nacimiento: ${formatearFechaCorta(miembro.fecha_nacimiento)}`, margen, y); y += 5;
             const esMagda = miembro.apodo === 'Magda';
@@ -463,34 +548,35 @@ async function exportarPDF(opciones) {
             }
             y += 4;
 
-            // Condiciones crónicas
             if (condiciones.length > 0) {
                 doc.setTextColor(180, 83, 9);
                 doc.setFont(undefined, 'bold');
                 doc.text('Condiciones crónicas:', margen, y); y += 5;
                 doc.setFont(undefined, 'normal');
-                doc.setTextColor(107, 114, 128);
+                doc.setTextColor(60, 60, 60);
                 condiciones.forEach(c => {
-                    doc.text(`• ${c.nombre}${c.descripcion ? ' — ' + c.descripcion : ''}`, margen + 4, y);
-                    y += 5;
+                    const linea = `- ${c.nombre}${c.descripcion ? ' - ' + c.descripcion : ''}`;
+                    const lineas = doc.splitTextToSize(linea, ancho - margen * 2 - 4);
+                    doc.text(lineas, margen + 4, y);
+                    y += lineas.length * 5;
                 });
                 y += 3;
             }
 
-            // Medicamentos en curso
             if (medsEnCurso.length > 0) {
-                doc.setTextColor(16, 185, 129);
+                doc.setTextColor(16, 130, 90);
                 doc.setFont(undefined, 'bold');
-                doc.text('💊 Medicamentos en curso:', margen, y); y += 5;
+                doc.text('Medicamentos en curso:', margen, y); y += 5;
                 doc.setFont(undefined, 'normal');
-                doc.setTextColor(107, 114, 128);
+                doc.setTextColor(60, 60, 60);
                 medsEnCurso.forEach(m => {
-                    let linea = `• ${m.nombre}`;
+                    let linea = `- ${m.nombre}`;
                     if (m.dosis) linea += ` ${m.dosis}`;
                     if (m.frecuencia) linea += ` · ${m.frecuencia}`;
                     if (m.motivo) linea += ` (${m.motivo})`;
-                    doc.text(linea, margen + 4, y);
-                    y += 5;
+                    const lineas = doc.splitTextToSize(linea, ancho - margen * 2 - 4);
+                    doc.text(lineas, margen + 4, y);
+                    y += lineas.length * 5;
                 });
                 y += 3;
             }
@@ -501,15 +587,15 @@ async function exportarPDF(opciones) {
         doc.setTextColor(26, 26, 46);
         doc.setFontSize(13);
         doc.setFont(undefined, 'bold');
-        doc.text('📊 Resumen del periodo', margen, y); y += 7;
+        doc.text('Resumen del periodo', margen, y); y += 7;
 
         doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
-        doc.setTextColor(107, 114, 128);
+        doc.setTextColor(60, 60, 60);
         doc.text(`Periodo: últimos ${mesesAtras} meses`, margen, y); y += 5;
         doc.text(`Total de eventos: ${stats.totalEventos}`, margen, y); y += 5;
         doc.text(`Síntomas registrados: ${stats.sintomas}`, margen, y); y += 5;
-        doc.text(`Consultas/Controles: ${stats.consultas}`, margen, y); y += 5;
+        doc.text(`Consultas y controles: ${stats.consultas}`, margen, y); y += 5;
         doc.text(`Medicamentos registrados: ${stats.medicamentosTotal}`, margen, y); y += 5;
         doc.text(`Promedio de eventos por mes: ${stats.promedioMensual}`, margen, y); y += 8;
 
@@ -519,7 +605,7 @@ async function exportarPDF(opciones) {
             doc.setTextColor(26, 26, 46);
             doc.setFontSize(13);
             doc.setFont(undefined, 'bold');
-            doc.text('📋 Historial de eventos', margen, y); y += 7;
+            doc.text('Historial de eventos', margen, y); y += 7;
 
             const eventosOrdenados = [...datos.eventos].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
@@ -527,22 +613,24 @@ async function exportarPDF(opciones) {
                 if (y > 270) { doc.addPage(); y = margen; }
 
                 const def = CAMPOS_POR_TIPO[evt.tipo] || {};
-                const emoji = def.emoji || '📌';
-                const tipoLabel = def.etiqueta || evt.tipo;
+                const tipoLabel = (def.etiqueta || evt.tipo).replace(/[^\x00-\x7F áéíóúÁÉÍÓÚñÑ]/g, '').trim();
 
+                // Título del evento (sin emojis)
                 doc.setFont(undefined, 'bold');
                 doc.setFontSize(11);
                 doc.setTextColor(26, 26, 46);
-                doc.text(`${emoji} ${evt.titulo}`, margen, y);
+                doc.text(evt.titulo, margen, y);
 
                 doc.setFont(undefined, 'normal');
                 doc.setFontSize(9);
-                doc.setTextColor(107, 114, 128);
+                doc.setTextColor(100, 100, 100);
                 const fechaTxt = formatearFechaCorta(evt.fecha);
                 doc.text(fechaTxt, ancho - margen - 25, y);
                 y += 5;
 
+                // Meta info
                 doc.setFontSize(9);
+                doc.setTextColor(100, 100, 100);
                 let metaTxt = tipoLabel;
                 if (evt.miembros?.apodo && !miembro) metaTxt += ` · ${evt.miembros.apodo}`;
                 if (evt.severidad) {
@@ -558,10 +646,9 @@ async function exportarPDF(opciones) {
                     y += lineas.length * 4;
                 }
 
-                // Detalles de consulta si los hay
                 const consultaDetalle = datos.consultas.find(c => c.evento_id === evt.id);
                 if (consultaDetalle) {
-                    doc.setTextColor(107, 114, 128);
+                    doc.setTextColor(80, 80, 80);
                     if (consultaDetalle.medico_nombre) { doc.text(`Médico: ${consultaDetalle.medico_nombre}`, margen + 2, y); y += 4; }
                     if (consultaDetalle.especialidad) { doc.text(`Especialidad: ${consultaDetalle.especialidad}`, margen + 2, y); y += 4; }
                     if (consultaDetalle.centro_medico) { doc.text(`Centro: ${consultaDetalle.centro_medico}`, margen + 2, y); y += 4; }
@@ -575,10 +662,14 @@ async function exportarPDF(opciones) {
                         doc.text(lineas, margen + 2, y);
                         y += lineas.length * 4;
                     }
+                    if (consultaDetalle.proximo_control) {
+                        doc.text(`Próximo control: ${formatearFechaCorta(consultaDetalle.proximo_control)}`, margen + 2, y);
+                        y += 4;
+                    }
                 }
 
                 y += 4;
-                doc.setDrawColor(229, 231, 235);
+                doc.setDrawColor(220, 220, 220);
                 doc.line(margen, y - 1, ancho - margen, y - 1);
                 y += 2;
             }
@@ -601,29 +692,30 @@ async function exportarPDF(opciones) {
                     doc.setTextColor(26, 26, 46);
                     doc.setFontSize(13);
                     doc.setFont(undefined, 'bold');
-                    doc.text('📷 Documentos adjuntos', margen, y); y += 8;
+                    doc.text('Documentos adjuntos', margen, y); y += 8;
 
                     for (const foto of fotos) {
-                        if (y > 230) { doc.addPage(); y = margen; }
+                        if (y > 220) { doc.addPage(); y = margen; }
                         try {
                             const url = await obtenerUrlFirmada(foto.ruta_storage, 600);
                             if (!url) continue;
 
                             const img = await cargarImagenComoBase64(url);
-                            const imgAncho = 80;
-                            const imgAlto = 60;
+                            const imgAncho = 120;
+                            const imgAlto = 90;
 
-                            doc.setFontSize(9);
+                            doc.setFontSize(10);
                             doc.setFont(undefined, 'bold');
-                            doc.setTextColor(155, 93, 229);
+                            doc.setTextColor(80, 80, 80);
                             const tipoInfo = TIPOS_DOCUMENTO[foto.tipo] || TIPOS_DOCUMENTO.otro;
-                            doc.text(`${tipoInfo.emoji} ${tipoInfo.label}`, margen, y); y += 5;
+                            doc.text(tipoInfo.label, margen, y); y += 5;
                             doc.setFont(undefined, 'normal');
-                            doc.setTextColor(107, 114, 128);
+                            doc.setTextColor(120, 120, 120);
+                            doc.setFontSize(9);
                             doc.text(foto.nombre_archivo, margen, y); y += 4;
 
                             doc.addImage(img, 'JPEG', margen, y, imgAncho, imgAlto);
-                            y += imgAlto + 8;
+                            y += imgAlto + 10;
                         } catch (err) {
                             console.warn('Error agregando imagen al PDF:', err);
                         }
@@ -639,22 +731,20 @@ async function exportarPDF(opciones) {
             doc.setFontSize(8);
             doc.setTextColor(150, 150, 150);
             doc.text(`Página ${i} de ${totalPaginas}`, ancho - margen - 20, alto - 8);
-            doc.text('🐷 Salud Marrana - Bitácora familiar', margen, alto - 8);
+            doc.text('Salud Marrana - Bitácora familiar', margen, alto - 8);
         }
 
-        // Descargar
         const nombreMiembro = miembro ? miembro.apodo.toLowerCase() : 'familia';
         const fechaArchivo = new Date().toISOString().split('T')[0];
         doc.save(`salud-marrana-${nombreMiembro}-${fechaArchivo}.pdf`);
 
-        mostrarToast('PDF generado ✅', 'exito');
+        mostrarToast('PDF generado correctamente', 'exito');
     } catch (err) {
         console.error('Error generando PDF:', err);
         mostrarToast('Error generando PDF: ' + err.message, 'error');
     }
 }
 
-// Helper: convertir imagen URL a base64 para jsPDF
 async function cargarImagenComoBase64(url) {
     const response = await fetch(url);
     const blob = await response.blob();
@@ -716,7 +806,6 @@ window.abrirModalExportar = function(miembroPreseleccionado = null) {
     `;
     document.body.appendChild(modal);
 
-    // Cargar miembros
     cargarMiembrosSimple().then(miembros => {
         const select = document.getElementById('exp-miembro');
         miembros.forEach(m => {
@@ -743,7 +832,6 @@ window.ejecutarExportar = async function() {
     await exportarPDF({ miembroId, mesesAtras: meses, incluirFotos: fotos });
 };
 
-// Helper para cargar miembros (compartido)
 async function cargarMiembrosSimple() {
     const { data } = await sb
         .from('miembros')
