@@ -1,5 +1,5 @@
 /* =====================================================
-   SALUD MARRANA - Estilos completos (FINAL Paso 5)
+   SALUD MARRANA - Estilos completos (FINAL Paso 5.5)
    ===================================================== */
 
 :root {
@@ -177,7 +177,7 @@ body {
 .card-bienvenida h2 { font-size: 20px; margin-bottom: 4px; }
 .card-bienvenida p { opacity: 0.95; font-size: 14px; }
 
-/* BOTÓN VOZ DESTACADO (dashboard) */
+/* BOTÓN VOZ DESTACADO */
 .btn-voz-destacado {
     width: 100%;
     background: linear-gradient(135deg, #FF6B9D 0%, #FFC371 100%);
@@ -218,44 +218,44 @@ body {
     gap: 2px;
 }
 
-.btn-voz-texto strong {
-    font-size: 16px;
-    font-weight: 700;
-}
+.btn-voz-texto strong { font-size: 16px; font-weight: 700; }
+.btn-voz-texto small { font-size: 12px; opacity: 0.95; }
 
-.btn-voz-texto small {
-    font-size: 12px;
-    opacity: 0.95;
-}
-
-/* FAB DE VOZ (en formulario) */
-.fab-voz {
+/* FAB */
+.fab-voz, .fab-recordatorio {
     position: fixed;
     bottom: 24px;
     right: 24px;
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #FF6B9D 0%, #FFC371 100%);
     color: white;
     border: none;
     font-size: 26px;
     cursor: pointer;
-    box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
     z-index: 90;
     transition: all 0.2s;
 }
 
-.fab-voz:hover {
-    transform: scale(1.05);
-    box-shadow: 0 8px 24px rgba(255, 107, 157, 0.5);
+.fab-voz {
+    background: linear-gradient(135deg, #FF6B9D 0%, #FFC371 100%);
+    box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
 }
 
-.fab-voz:active {
+.fab-recordatorio {
+    background: linear-gradient(135deg, var(--color-naty) 0%, var(--color-magda) 100%);
+    box-shadow: 0 6px 20px rgba(155, 93, 229, 0.4);
+}
+
+.fab-voz:hover, .fab-recordatorio:hover {
+    transform: scale(1.05);
+}
+
+.fab-voz:active, .fab-recordatorio:active {
     transform: scale(0.95);
 }
 
-/* MODAL DE VOZ */
+/* MODAL DE VOZ Y RECORDATORIO */
 .voz-modal {
     position: fixed;
     inset: 0;
@@ -291,10 +291,7 @@ body {
     align-items: center;
 }
 
-.voz-modal-header h3 {
-    font-size: 18px;
-    font-weight: 700;
-}
+.voz-modal-header h3 { font-size: 18px; font-weight: 700; }
 
 .voz-cerrar {
     background: transparent;
@@ -348,18 +345,10 @@ body {
     line-height: 1.5;
 }
 
-.voz-texto-final {
-    color: var(--texto-principal);
-}
+.voz-texto-final { color: var(--texto-principal); }
+.voz-texto-interim { color: var(--texto-secundario); font-style: italic; }
 
-.voz-texto-interim {
-    color: var(--texto-secundario);
-    font-style: italic;
-}
-
-.voz-resultado {
-    margin-top: 16px;
-}
+.voz-resultado { margin-top: 16px; }
 
 .voz-resultado-card {
     background: linear-gradient(135deg, rgba(155, 93, 229, 0.05) 0%, rgba(0, 187, 249, 0.05) 100%);
@@ -429,8 +418,164 @@ body {
     50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
 }
 
-.btn-mic-icono {
-    font-size: 20px;
+.btn-mic-icono { font-size: 20px; }
+
+/* RECORDATORIOS */
+.filtros-miembros {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filtro-chip {
+    background: var(--bg-card);
+    border: 2px solid var(--borde);
+    border-radius: 50px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    --color-miembro: var(--color-naty);
+}
+
+.filtro-chip:hover { border-color: var(--color-miembro); }
+
+.filtro-chip.activo {
+    background: var(--color-miembro);
+    color: white;
+    border-color: var(--color-miembro);
+}
+
+.recordatorios-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.recordatorio-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    box-shadow: var(--sombra-sm);
+    display: flex;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    border-left: 4px solid var(--borde);
+}
+
+.recordatorio-card.urgencia-vencido,
+.recordatorio-card.urgencia-hoy {
+    border-left-color: var(--color-error);
+    background: rgba(239, 68, 68, 0.04);
+}
+
+.recordatorio-card.urgencia-maniana,
+.recordatorio-card.urgencia-pronto {
+    border-left-color: var(--color-alerta);
+    background: rgba(245, 158, 11, 0.04);
+}
+
+.recordatorio-card.urgencia-esta_semana {
+    border-left-color: var(--color-exito);
+}
+
+.recordatorio-color {
+    width: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    align-self: stretch;
+}
+
+.recordatorio-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.recordatorio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.recordatorio-tipo {
+    font-size: 11px;
+    color: var(--texto-secundario);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.recordatorio-urgencia {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.recordatorio-titulo {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--texto-principal);
+}
+
+.recordatorio-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--texto-secundario);
+}
+
+.recordatorio-descripcion {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--texto-secundario);
+    background: rgba(0,0,0,0.03);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+}
+
+.recordatorio-acciones {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.btn-recordatorio-completar,
+.btn-recordatorio-eliminar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-recordatorio-completar {
+    background: var(--color-exito);
+    color: white;
+}
+
+.btn-recordatorio-completar:hover { transform: scale(1.1); }
+
+.btn-recordatorio-eliminar {
+    background: transparent;
+    color: var(--color-error);
+    border: 1px solid var(--borde);
+}
+
+.btn-recordatorio-eliminar:hover {
+    background: var(--color-error);
+    color: white;
 }
 
 /* SECCIONES */
@@ -845,11 +990,7 @@ body {
 
 .acordeon-trigger:hover { background: rgba(155, 93, 229, 0.04); }
 
-.acordeon-icono {
-    transition: transform 0.2s;
-    font-size: 10px;
-}
-
+.acordeon-icono { transition: transform 0.2s; font-size: 10px; }
 .acordeon.abierto .acordeon-icono { transform: rotate(180deg); }
 
 .acordeon-contenido {
@@ -1073,10 +1214,7 @@ body {
     line-height: 1.2;
 }
 
-.doc-icono-pdf-grande small {
-    font-size: 12px;
-    font-weight: 600;
-}
+.doc-icono-pdf-grande small { font-size: 12px; font-weight: 600; }
 
 .doc-guardado-info { padding: 8px 10px; }
 
