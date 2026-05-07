@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Tendencias - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="history.back()">←</button>
+                <h1 id="titulo-header">Tendencias</h1>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div id="loading-tendencias" class="loading-pantalla">
+                <div class="spinner-grande"></div>
+                <p>Cargando tendencias...</p>
+            </div>
+
+            <div id="contenido-tendencias" style="display: none;">
+                <div id="hero-miembro" class="perfil-hero"></div>
+
+                <button class="btn-voz-destacado" id="btn-exportar-miembro" style="background: linear-gradient(135deg, #06A77D 0%, #10B981 100%);">
+                    <span class="btn-voz-icono">📄</span>
+                    <div class="btn-voz-texto">
+                        <strong>Exportar PDF</strong>
+                        <small>Reporte completo para llevar al médico</small>
+                    </div>
+                </button>
+
+                <div class="seccion">
+                    <div class="seccion-titulo">Resumen del periodo</div>
+                    <div class="stats-grid" id="stats-grid"></div>
+                </div>
+
+                <div class="seccion">
+                    <div class="seccion-titulo">Síntomas por mes</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-sintomas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <div class="seccion-titulo">Eventos por tipo</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-tipos"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <div class="seccion-titulo">Consultas por especialidad</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-especialidades"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <div class="seccion-titulo">Medicamentos más usados</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-medicamentos"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="seccion" id="seccion-peso" style="display: none;">
+                    <div class="seccion-titulo">Curva de peso</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-peso"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="seccion" id="seccion-talla" style="display: none;">
+                    <div class="seccion-titulo">Curva de talla</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-talla"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/eventos.js"></script>
+    <script src="js/documentos.js"></script>
+    <script src="js/reportes.js"></script>
+
+    <script>
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            const params = new URLSearchParams(window.location.search);
+            const miembroId = params.get('id');
+            if (!miembroId) {
+                mostrarToast('Falta el id del miembro', 'error');
+                setTimeout(() => history.back(), 1500);
+                return;
+            }
+
+            // Cargar datos del miembro
+            const { data: miembro } = await sb.from('miembros').select('*').eq('id', miembroId).single();
+            const datos = await cargarDatosReporte(miembroId, 12);
+            const stats = calcularEstadisticas(datos);
+
+            document.getElementById('titulo-header').textContent = `Tendencias de ${miembro.apodo}`;
+
+            // Hero
+            const heroEl = document.getElementById('hero-miembro');
+            heroEl.style.background = `linear-gradient(135deg, ${miembro.color_hex} 0%, ${miembro.color_hex}DD 100%)`;
+            heroEl.innerHTML = `
+                <div class="perfil-hero-emoji">${miembro.emoji}</div>
+                <h2>${miembro.apodo}</h2>
+                <div class="nombre-completo">Tendencias últimos 12 meses</div>
+            `;
+
+            // Stats
+            document.getElementById('stats-grid').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.totalEventos}</div>
+                    <div class="stat-label">Total eventos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.sintomas}</div>
+                    <div class="stat-label">Síntomas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.consultas}</div>
+                    <div class="stat-label">Consultas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.enCurso}</div>
+                    <div class="stat-label">Meds en curso</div>
+                </div>
+            `;
+
+            // Botón exportar
+            document.getElementById('btn-exportar-miembro').onclick = () => abrirModalExportar(miembroId);
+
+            document.getElementById('loading-tendencias').style.display = 'none';
+            document.getElementById('contenido-tendencias').style.display = 'block';
+
+            // Gráficos
+            graficoSintomasPorMes('grafico-sintomas', datos);
+            graficoEventosPorTipo('grafico-tipos', datos);
+            graficoConsultasPorEspecialidad('grafico-especialidades', datos);
+            graficoMedicamentosMasUsados('grafico-medicamentos', datos);
+
+            // Curvas (solo si hay datos)
+            if (datos.mediciones.filter(m => m.peso_kg).length >= 2) {
+                document.getElementById('seccion-peso').style.display = 'block';
+                graficoCurvaPeso('grafico-peso', datos, miembro.color_hex);
+            }
+            if (datos.mediciones.filter(m => m.talla_cm).length >= 2) {
+                document.getElementById('seccion-talla').style.display = 'block';
+                graficoCurvaTalla('grafico-talla', datos, miembro.color_hex);
+            }
+        })();
+    </script>
+</body>
+</html>
