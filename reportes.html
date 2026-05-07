@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#9B5DE5">
+    <title>Reportes - Salud Marrana</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div style="display: flex; align-items: center;">
+                <button class="btn-back" onclick="window.location.href='index.html'">←</button>
+                <h1>📊 Reportes</h1>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div class="card-bienvenida" style="background: linear-gradient(135deg, #9B5DE5 0%, #00BBF9 100%);">
+                <h2>📊 Tendencias familiares</h2>
+                <p>Vista general de la salud de la familia</p>
+            </div>
+
+            <button class="btn-voz-destacado" style="background: linear-gradient(135deg, #06A77D 0%, #10B981 100%);" onclick="abrirModalExportar()">
+                <span class="btn-voz-icono">📄</span>
+                <div class="btn-voz-texto">
+                    <strong>Exportar PDF para médico</strong>
+                    <small>Reporte filtrable con historial completo</small>
+                </div>
+            </button>
+
+            <div id="loading-reportes" class="loading-pantalla">
+                <div class="spinner-grande"></div>
+                <p>Cargando datos...</p>
+            </div>
+
+            <div id="contenido-reportes" style="display: none;">
+                <!-- Estadísticas resumen -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Resumen últimos 12 meses</div>
+                    <div class="stats-grid" id="stats-grid"></div>
+                </div>
+
+                <!-- Comparativa familiar -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Eventos por miembro</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-familia"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Eventos por tipo -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Distribución por tipo de evento</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-tipos"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Síntomas por mes -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Frecuencia de síntomas por mes</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-sintomas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Consultas por especialidad -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Consultas por especialidad</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-especialidades"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medicamentos más usados -->
+                <div class="seccion">
+                    <div class="seccion-titulo">Medicamentos más usados</div>
+                    <div class="grafico-card">
+                        <div class="grafico-container">
+                            <canvas id="grafico-medicamentos"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/eventos.js"></script>
+    <script src="js/documentos.js"></script>
+    <script src="js/reportes.js"></script>
+
+    <script>
+        (async () => {
+            const ok = await protegerPagina();
+            if (!ok) return;
+
+            const datos = await cargarDatosReporte(null, 12);
+            const stats = calcularEstadisticas(datos);
+
+            // Renderizar stats
+            const statsEl = document.getElementById('stats-grid');
+            statsEl.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.totalEventos}</div>
+                    <div class="stat-label">Total eventos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.sintomas}</div>
+                    <div class="stat-label">Síntomas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.consultas}</div>
+                    <div class="stat-label">Consultas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.enCurso}</div>
+                    <div class="stat-label">Medicamentos en curso</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-numero">${stats.promedioMensual}</div>
+                    <div class="stat-label">Eventos por mes</div>
+                </div>
+            `;
+
+            document.getElementById('loading-reportes').style.display = 'none';
+            document.getElementById('contenido-reportes').style.display = 'block';
+
+            // Renderizar gráficos
+            graficoComparativaFamilia('grafico-familia', datos);
+            graficoEventosPorTipo('grafico-tipos', datos);
+            graficoSintomasPorMes('grafico-sintomas', datos);
+            graficoConsultasPorEspecialidad('grafico-especialidades', datos);
+            graficoMedicamentosMasUsados('grafico-medicamentos', datos);
+        })();
+    </script>
+</body>
+</html>
