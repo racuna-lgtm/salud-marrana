@@ -119,14 +119,12 @@
                 return;
             }
 
-            // Cargar datos del miembro
             const { data: miembro } = await sb.from('miembros').select('*').eq('id', miembroId).single();
             const datos = await cargarDatosReporte(miembroId, 12);
             const stats = calcularEstadisticas(datos);
 
             document.getElementById('titulo-header').textContent = `Tendencias de ${miembro.apodo}`;
 
-            // Hero
             const heroEl = document.getElementById('hero-miembro');
             heroEl.style.background = `linear-gradient(135deg, ${miembro.color_hex} 0%, ${miembro.color_hex}DD 100%)`;
             heroEl.innerHTML = `
@@ -135,7 +133,6 @@
                 <div class="nombre-completo">Tendencias últimos 12 meses</div>
             `;
 
-            // Stats
             document.getElementById('stats-grid').innerHTML = `
                 <div class="stat-card">
                     <div class="stat-numero">${stats.totalEventos}</div>
@@ -155,19 +152,17 @@
                 </div>
             `;
 
-            // Botón exportar
             document.getElementById('btn-exportar-miembro').onclick = () => abrirModalExportar(miembroId);
 
             document.getElementById('loading-tendencias').style.display = 'none';
             document.getElementById('contenido-tendencias').style.display = 'block';
 
-            // Gráficos
-            graficoSintomasPorMes('grafico-sintomas', datos);
+            // Gráficos individuales con color del miembro
+            graficoSintomasPorMes('grafico-sintomas', datos, miembroId);
             graficoEventosPorTipo('grafico-tipos', datos);
             graficoConsultasPorEspecialidad('grafico-especialidades', datos);
-            graficoMedicamentosMasUsados('grafico-medicamentos', datos);
+            graficoMedicamentosMasUsados('grafico-medicamentos', datos, miembroId);
 
-            // Curvas (solo si hay datos)
             if (datos.mediciones.filter(m => m.peso_kg).length >= 2) {
                 document.getElementById('seccion-peso').style.display = 'block';
                 graficoCurvaPeso('grafico-peso', datos, miembro.color_hex);
