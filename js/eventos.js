@@ -1,5 +1,5 @@
 // =====================================================
-// SALUD MARRANA - Registro de eventos (FINAL Paso 4)
+// SALUD MARRANA - Registro de eventos (FIX recordatorios)
 // =====================================================
 
 const ESPECIALIDADES = [
@@ -561,9 +561,11 @@ async function guardarEvento() {
             };
             await sb.from('consultas_medicas').insert(consultaData);
 
+            // CREAR RECORDATORIO ASOCIADO AL EVENTO (con evento_id para cascade)
             if (consultaData.proximo_control) {
                 await sb.from('recordatorios').insert({
                     miembro_id: miembroId,
+                    evento_id: evento.id, // ← CLAVE para que se borre en cascada
                     titulo: `Control: ${tituloFinal}`,
                     descripcion: consultaData.medico_nombre || '',
                     fecha: consultaData.proximo_control,
@@ -705,6 +707,10 @@ async function eliminarEvento(eventoId, miembroId) {
     if (!confirm('¿Eliminar este evento? Esta acción no se puede deshacer.')) return;
 
     try {
+        // Borrar recordatorios asociados primero (por si la cascade no está)
+        await sb.from('recordatorios').delete().eq('evento_id', eventoId);
+
+        // Borrar el evento (las demás tablas tienen ON DELETE CASCADE)
         const { error } = await sb
             .from('eventos')
             .delete()
@@ -718,6 +724,6 @@ async function eliminarEvento(eventoId, miembroId) {
         }, 800);
     } catch (err) {
         console.error(err);
-        mostrarToast('Error al eliminar', 'error');
+        mostrarToast('Error al eliminar: ' + err.message, 'error');
     }
 }
